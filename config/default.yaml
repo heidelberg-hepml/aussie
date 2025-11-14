@@ -1,0 +1,52 @@
+run_name: ???
+experiment: ???
+train: True
+evaluate: True
+plot: True
+
+use_gpu: True
+device: 0
+use_tf32: True
+use_amp: False
+num_cpus: 0
+dry_run: False
+submit: False
+run_dir: runs
+prev_exp_dir: null
+
+num_bnn_samples: 10
+
+data:
+  num: null
+  val_frac: 0.1
+  test_frac: 0.2
+  on_gpu: False
+
+training:
+  epochs: 1
+  lr: 1.e-3
+  batch_size: 32
+  test_batch_size: 4096
+  optimizer:
+    _target_: schedulefree.AdamWScheduleFree
+    weight_decay: 0.
+  scheduler: {}
+  gradient_norm: null
+  validate_freq: 1
+  patience: null
+  save_best_epoch: True
+  save_freq: null
+  warm_start: null
+  warm_start_epoch: null
+  use_tensorboard: True
+  log_iters: 500
+
+plotting:
+  pagewidth: 10
+  num_bins: 45
+
+defaults:
+  - cluster: slurm
+  - dataset: omnifold
+  - hydra
+  - _self_

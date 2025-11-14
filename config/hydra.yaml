@@ -1,0 +1,14 @@
+hydra:
+  run:
+    dir: runs/${run_name}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: ${hydra.run.dir}
+  job_logging:
+    # version: 1
+    # root: null
+    disable_existing_loggers: false    
+    formatters:
+      simple:
+        # format: '[%(levelname)s] - %(message)s'  
+        format: "[%(asctime)s %(levelname)-1.1s] %(message)s"
+        datefmt: "%H:%M:%S"

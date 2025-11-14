@@ -1,0 +1,13 @@
+_target_: src.networks.TransformerEncoder
+dim_in: ???
+dim_out: ???
+dim_cond: null
+hidden_channels: 64
+num_blocks: 2
+num_heads: 2
+mlp_ratio: 2
+checkpoint_grads: false
+drop_attn: 0
+drop_proj: 0
+drop_mlp: 0
+bayesian: false

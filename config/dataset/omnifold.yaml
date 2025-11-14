@@ -1,0 +1,18 @@
+name: omnifold
+dir: /remote/gpu02/ore/data/energyflow
+max_num: 1_600_000
+dim: 6
+preprocessing:
+  _target_: src.utils.transforms.OmniFoldTransform
+  shift_x:
+    _target_: torch.tensor
+    data: [-3.2852,  2.8379,  1.9633, -2.5057, -2.0682,  0.2401]
+  scale_x:
+    _target_: torch.tensor
+    data: [0.9177, 0.4593, 1.1577, 0.5972, 0.6403, 0.1191]
+  shift_z:
+    _target_: torch.tensor
+    data: [-3.4062,  3.1988,  1.8654, -2.5909, -2.2248,  0.2337]
+  scale_z:
+    _target_: torch.tensor
+    data: [0.9155, 0.4019, 1.1282, 0.5534, 0.6859, 0.1154]

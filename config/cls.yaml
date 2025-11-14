@@ -1,0 +1,29 @@
+defaults:
+  - /default
+  - /net: mlp
+  - _self_
+
+run_name: classify_${dataset.name}
+experiment: ClassificationExperiment
+
+loss: bce
+bayesian: false
+
+model:
+  _target_: src.models.Classifier
+
+net:
+  dim_in: ${dataset.dim}
+  num_hidden_layers: 3
+  hidden_channels: 128
+  dim_out: 1
+  bayesian: ${bayesian}
+
+training:
+  lr: 1e-3
+  epochs: 500
+  batch_size: 4096
+  patience: 50
+
+data:
+  on_gpu: true

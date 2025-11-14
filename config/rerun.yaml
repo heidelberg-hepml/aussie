@@ -1,0 +1,18 @@
+run_name: rerun
+prev_exp_dir: ???
+train: false
+
+hydra:
+  output_subdir: null
+  run:
+    dir: ${prev_exp_dir}
+  sweep:
+    dir: .
+  job_logging:
+    formatters:
+      simple:
+        format: "[%(asctime)s %(levelname)-1.1s][RERUN] %(message)s"    
+
+defaults:
+  - default
+  - _self_

@@ -1,0 +1,8 @@
+scheduler: slurm
+queue: gshort
+mem: 48G
+time: '40:0:0'
+num_gpus: 1
+num_cpus: 1
+dependency: null
+node: null
