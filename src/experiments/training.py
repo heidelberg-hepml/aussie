@@ -4,7 +4,7 @@ from hydra.utils import call, instantiate
 from torch.utils.data import DataLoader, random_split
 
 from src.experiments.base_experiment import BaseExperiment
-from station.src.datasets import UnfoldingData
+from src.datasets import UnfoldingData
 from src.utils.trainer import Trainer
 
 
