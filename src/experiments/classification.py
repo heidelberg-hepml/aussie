@@ -6,48 +6,14 @@ import torch
 from collections import defaultdict
 from hydra.utils import instantiate
 from matplotlib.backends.backend_pdf import PdfPages
+
 # from sklearn.calibration import calibration_curve
 # from sklearn.metrics import roc_auc_score
 
 from src.experiments.training import TrainingExperiment
 from src.utils import plotting
-from src.utils.datasets import StationData
-
 
 class ClassificationExperiment(TrainingExperiment):
-
-    # @property
-    # def iterating(self):
-    #     return self.cfg.w_prev_path is not None
-
-    def init_preprocessing(self):
-
-        self.train_keys = ["x_sim", "x_dat"]
-        self.transforms = [instantiate(self.cfg.dataset.preprocessing).to(self.device)]
-
-    @property
-    def reader(self):
-
-        # select dataset
-        match name := self.cfg.dataset.name:
-
-            case "omnifold":
-                reader = StationData.read_omnifold
-            case _:
-                raise ValueError(f"Unknown dataset {name}")
-
-        return reader
-
-    def init_dataset(self):
-
-        num = self.cfg.data.num or self.cfg.dataset.max_num
-        dset = self.reader(
-            path=self.cfg.dataset.dir,
-            num=num,
-            keys=self.train_keys,
-        )
-
-        return dset
 
     @torch.inference_mode()
     def evaluate(self, dataloader, tag=None):
@@ -67,19 +33,15 @@ class ClassificationExperiment(TrainingExperiment):
                 self.model.reseed()
 
             # collect predictions
-            lw_dat, lw_sim = [], []
-            for batch in dataloader:
-                batch = batch.to(self.device, non_blocking=True)
+            lw_x = [
+                self.model(batch.to(self.device, non_blocking=True)).squeeze(-1)
+                for batch in dataloader
+            ]
 
-                lw_dat.append(self.model(batch.x_dat).squeeze(-1))
-                lw_sim.append(self.model(batch.x_sim).squeeze(-1))
-
-            predictions["lw_x_dat"].append(torch.cat(lw_dat).cpu())
-            predictions["lw_x_sim"].append(torch.cat(lw_sim).cpu())
+            predictions["lw_x"].append(torch.cat(lw_x).cpu())
 
         # stack
-        predictions["lw_x_dat"] = torch.stack(predictions["lw_x_dat"])
-        predictions["lw_x_sim"] = torch.stack(predictions["lw_x_sim"])
+        predictions["lw_x"] = torch.stack(predictions["lw_x"]).numpy()
 
         # save to disk
         tag = "" if tag is None else f"_{tag}"
@@ -95,45 +57,39 @@ class ClassificationExperiment(TrainingExperiment):
         savedir = os.path.join(self.exp_dir, "plots")
         os.makedirs(savedir, exist_ok=True)
 
-        # load test data for histograms
+        # read (untransformed) test data
         self.log.info("Loading test data")
-        plot_keys = [
-            "x_dat",
-            "z_dat",
-            "x_sim",
-            "z_sim",
-        ]
-
-        num = self.cfg.data.num or self.cfg.dataset.max_num
-        dset = self.reader(  # TODO: Just use test loader
-            path=self.cfg.dataset.dir, keys=plot_keys, num=num
-        )
-
+        dset = instantiate(self.cfg.dataset.reader)  # TODO: Just use test loader
         _, _, test_set = self.split_dataset(dset)
 
-        # read predicted weights from disk
+        # read predicted weights
         self.log.info("Reading predictions from disk")
         record = np.load(os.path.join(self.exp_dir, "predictions.npz"))
 
-        lw_dat, lw_sim = record["lw_x_dat"], record["lw_x_sim"]
+        mask_sim = test_set[:].labels == 0
+        mask_dat = ~mask_sim
+        lw_x_sim = record["lw_x"][..., mask_sim.numpy()].mean(0)
 
         # observables
         self.log.info("Plotting reco observables")
+        x_dat = test_set[:].x[mask_dat]
+        x_sim = test_set[:].x[mask_sim]
         with PdfPages(os.path.join(savedir, f"observables.pdf")) as pdf:
-            for i in range(self.cfg.dataset.dim):
+            for obs in self.process.observables:
                 fig, ax = plotting.plot_reweighting(
-                    exp=test_set[:].x_dat[:, i].numpy(),
-                    sim=test_set[:].x_sim[:, i].numpy(),
-                    weights_list=[np.exp(lw_sim)],
+                    exp=obs.compute(x_dat).numpy(),
+                    sim=obs.compute(x_sim).numpy(),
+                    weights_list=[np.exp(lw_x_sim)],
                     variance_list=[None],
                     names_list=["Classifier"],
                     # xlabel=pcfg.obs_labels[i],
-                    xlabel="",
+                    xlabel=obs.label,
                     figsize=np.array([1, 5 / 6]) * pw / 2,
                     num_bins=pcfg.num_bins,
-                    discrete=2 if i == 1 else False,
-                    logy=True,
-                    qlims=(5e-3, 1 - 5e-3),
+                    discrete=obs.discrete,
+                    logy=obs.logy,
+                    qlims=obs.qlims,
+                    xlims=obs.xlims,
                     # exp_weights=exp_weights,
                 )
                 pdf.savefig(fig)
@@ -141,22 +97,25 @@ class ClassificationExperiment(TrainingExperiment):
 
         # latents
         self.log.info("Plotting part latents")
+        z_dat = test_set[:].z[mask_dat]
+        z_sim = test_set[:].z[mask_sim]
         with PdfPages(os.path.join(savedir, f"latents.pdf")) as pdf:
-            for i in range(self.cfg.dataset.dim):
+            for obs in self.process.observables:
                 fig, ax = plotting.plot_reweighting(
-                    exp=test_set[:].z_dat[:, i].numpy(),
-                    sim=test_set[:].z_sim[:, i].numpy(),
-                    weights_list=[np.exp(lw_sim)],
+                    exp=obs.compute(z_dat).numpy(),
+                    sim=obs.compute(z_sim).numpy(),
+                    weights_list=[np.exp(lw_x_sim)],
                     variance_list=[None],
                     names_list=["Classifier"],
                     # xlabel=pcfg.obs_labels[i],
-                    xlabel="",
+                    xlabel=obs.label,
                     figsize=np.array([1, 5 / 6]) * pw / 2,
                     num_bins=pcfg.num_bins,
-                    discrete=2 if i == 1 else False,
-                    logy=True,
-                    qlims=(5e-3, 1 - 5e-3),
+                    discrete=obs.discrete,
+                    logy=obs.logy,
+                    qlims=obs.qlims,
+                    xlims=obs.xlims,
                     # exp_weights=exp_weights,
                 )
                 pdf.savefig(fig)
-                plt.close(fig)                
+                plt.close(fig)

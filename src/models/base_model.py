@@ -8,7 +8,7 @@ from collections import defaultdict
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-from src.utils.datasets import StationData
+from src.datasets import UnfoldingData
 
 log = logging.getLogger("Model")
 
@@ -33,7 +33,7 @@ class Model(nn.Module):
             self.register_buffer("train_size", torch.zeros(()))
 
     @abstractmethod
-    def batch_loss(self, batch: StationData, training=True):
+    def batch_loss(self, batch: UnfoldingData, training=True):
         pass
 
     @property

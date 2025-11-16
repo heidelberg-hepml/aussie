@@ -5,15 +5,15 @@ from scipy.stats import binned_statistic, norm
 
 # pyplot config
 pyplot_cfg = {
-    "axes.formatter.limits": [-2, 2.99],
+    # "axes.formatter.limits": [-2, 2.99],
     "axes.titlesize": 14,
     "font.size": 14,
     "font.family": "serif",
     "legend.fontsize": 12,
-    "figure.subplot.top":  0.95,
-    "figure.subplot.bottom":  0.15,
-    "figure.subplot.left":  0.14,
-    "figure.subplot.right":  0.96,
+    "figure.subplot.top": 0.95,
+    "figure.subplot.bottom": 0.15,
+    "figure.subplot.left": 0.14,
+    "figure.subplot.right": 0.96,
     "savefig.pad_inches": 0.1,
     "savefig.dpi": 300,
     "text.usetex": True,
@@ -26,6 +26,7 @@ pyplot_cfg = {
 plt.rcParams.update(pyplot_cfg)
 
 BLACK = "#323232"
+
 
 def add_reweighting_histogram(ax, exp, sim, sim_weights, num_bins=32, discrete=False):
 
@@ -151,7 +152,7 @@ def plot_reweighting(
     name_sim="Sim",
     denom_idx=0,
     ratio_lims=(0.85, 1.15),
-    density=False,
+    density=True,
     add_chi2=True,
     exp_weights=None,
 ):
@@ -214,29 +215,44 @@ def plot_reweighting(
 
     ys = (y_exp, y_sim, *y_rews)
     errs = (err_exp, err_sim, *err_rews)
-    labels_rew = names_list # [f"{n}[{name_sim}]" for n in names_list]
+    labels_rew = names_list  # [f"{n}[{name_sim}]" for n in names_list]
     labels = (name_exp, name_sim, *names_list)
 
     # colors = (BLACK, "C0", "C2", "C3", "C4", 'C5')
     # colors = [BLACK, "#1D6A9E", "#ea6702", "#009826"] + [f"C{i}" for i in range(3,8)]
-    colors = [BLACK, "#1D6A9E", "#7E3B91", "#009826", "C1", "C3", "#13b2b7"]# + [f"C{i}" for i in [1] + list(range(3, 8))]
+    colors = [
+        BLACK,
+        "#1D6A9E",
+        "#7E3B91",
+        "#009826",
+        "C1",
+        "C3",
+        "#13b2b7",
+    ]  # + [f"C{i}" for i in [1] + list(range(3, 8))]
     denom = ys[denom_idx]
     dup_last = lambda a: np.append(a, a[-1])
     legend_objs, legend_labels = [], []
     for y, err, label, color in zip(ys, errs, labels, colors):
-        
+
         if add_chi2 and (label in labels_rew):
             if density:
-                pull = (y/y.sum() - y_exp/y_exp.sum()) / np.sqrt((err/y.sum())**2 + (err_exp/y_exp.sum())**2)
+                pull = (y / y.sum() - y_exp / y_exp.sum()) / np.sqrt(
+                    (err / y.sum()) ** 2 + (err_exp / y_exp.sum()) ** 2
+                )
             else:
                 pull = (y - y_exp) / np.sqrt(err**2 + err_exp**2)
-            
+
             chi2 = (pull**2).sum() / num_bins
             label += f" ({chi2:.2f})"
 
         legend_labels.append(label)
 
-        scale = 1 / y.sum() if density else 1
+        scale = (
+            1 if not density
+            else 1 / y_sim.sum() if (label in labels_rew)
+            else 1 / y.sum()
+        )
+
         (line_obj,) = main_ax.step(
             bins,
             dup_last(y) * scale,
@@ -280,7 +296,10 @@ def plot_reweighting(
         main_ax.semilogy()
 
     # limits
-    main_ax.set_ylim(main_ax.get_ylim()[0], main_ax.get_ylim()[1]**1.15 if logy else 1.3*main_ax.get_ylim()[1])
+    # main_ax.set_ylim(
+    #     main_ax.get_ylim()[0],
+    #     main_ax.get_ylim()[1] ** 1.15 if logy else 1.3 * main_ax.get_ylim()[1],
+    # )
     ratio_ax.set_ylim(*ratio_lims)
     main_ax.set_xlim(bins[0], bins[-1])
     ratio_ax.set_xlim(bins[0], bins[-1])
@@ -290,7 +309,15 @@ def plot_reweighting(
     ratio_ax.set_ylabel("Ratio")
     ratio_ax.set_xlabel(xlabel)
 
-    main_ax.legend(legend_objs, legend_labels, frameon=False, handlelength=1.4, ncols=3, columnspacing=0.5, loc="upper center")
+    main_ax.legend(
+        legend_objs,
+        legend_labels,
+        frameon=False,
+        handlelength=1.4,
+        # ncols=3,
+        columnspacing=0.5,
+        # loc="upper center",
+    )
 
     if title is not None:
         main_ax.set_title(title)
@@ -472,7 +499,7 @@ def plot_syst_calibration(
     num_points_scatter=500,
     ref_lims=(-2.5, 2.5),
     diff_lims=(-0.5, 0.5),
-    pull_lims=(-3.5,3.5),
+    pull_lims=(-3.5, 3.5),
 ):
 
     # calculate pull
@@ -523,7 +550,7 @@ def plot_syst_calibration(
             ms=1,
             elinewidth=0.1,
             alpha=0.6,
-            color=colors[i]
+            color=colors[i],
         )
 
         # pull hist
@@ -533,7 +560,7 @@ def plot_syst_calibration(
             density=True,
             histtype="step" if num_quantiles > 1 else "stepfilled",
             alpha=1 if num_quantiles > 1 else 0.4,
-            color=colors[i]
+            color=colors[i],
         )
 
         # calib

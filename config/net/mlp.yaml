@@ -1,8 +1,8 @@
 _target_: src.networks.MLP
 dim_in: ???
 dim_out: ???
-hidden_channels: 64
-num_hidden_layers: 1
+hidden_channels: 128
+num_hidden_layers: 2
 act: silu
 out_act: null
 drop: null

@@ -1,10 +1,10 @@
 import torch
 from abc import abstractmethod
-from hydra.utils import call
+from hydra.utils import call, instantiate
 from torch.utils.data import DataLoader, random_split
 
 from src.experiments.base_experiment import BaseExperiment
-from src.utils.datasets import StationData
+from station.src.datasets import UnfoldingData
 from src.utils.trainer import Trainer
 
 
@@ -12,19 +12,19 @@ class TrainingExperiment(BaseExperiment):
 
     def run(self):
 
-        # initialize model
-        if self.cfg.train or self.cfg.evaluate:
+        # preprocessing and observables
+        self.process = instantiate(self.cfg.dataset.process)
+        self.process.transforms = [ # move tenors to device
+            t.to(self.device) for t in self.process.transforms
+        ]
 
+        if self.cfg.train or self.cfg.evaluate:
+            
+            # model
             if not hasattr(self, "model"):
                 self.init_model()
 
-            # preprocessing
-            self.init_preprocessing()
-            if self.transforms:
-                self.log.info(f"Loaded preprocessing transforms:\n{self.transforms}")
-
-        # initialize train/val dataloaders
-        if self.cfg.train or self.cfg.evaluate:
+            # initialize train/val dataloaders
             self.log.info(f"Creating dataLoaders")
             self.dataloaders = dict(
                 zip(("train", "val", "test"), self.init_dataloader())
@@ -89,7 +89,7 @@ class TrainingExperiment(BaseExperiment):
         tcfg = self.cfg.training
 
         # read data
-        dset = self.init_dataset()
+        dset = instantiate(self.cfg.dataset.reader)
 
         # optionally move dataset to gpu
         on_gpu = dcfg.on_gpu and self.cfg.use_gpu
@@ -99,24 +99,8 @@ class TrainingExperiment(BaseExperiment):
         self.log.info(f"Read dataset:\n{dset}")
 
         # preprocess
-        for transform in self.transforms:
+        for transform in self.process.transforms:
             dset = transform.forward(dset)
-
-        # # create splits
-        # assert dcfg.val_frac > 0, "A validation split is required"
-        # assert dcfg.test_frac > 0, "A testing split is required"
-
-        # # seed data split to avoid leakage across iterations
-        # fixed_rng = torch.Generator().manual_seed(1729)
-
-        # splits
-        # dsets = list(
-        #     random_split(
-        #         dset,
-        #         [1 - dcfg.val_frac - dcfg.test_frac, dcfg.val_frac, dcfg.test_frac],
-        #         generator=fixed_rng,
-        #     )
-        # )
 
         dsets = self.split_dataset(dset)
 
@@ -150,14 +134,13 @@ class TrainingExperiment(BaseExperiment):
     def split_dataset(self, dset):
 
         dcfg = self.cfg.data
-        
+
         # create splits
         assert dcfg.val_frac > 0, "A validation split is required"
         assert dcfg.test_frac > 0, "A testing split is required"
 
         # seed data split to avoid leakage across iterations
         fixed_rng = torch.Generator().manual_seed(1729)
-        
 
         splits = random_split(
             dset,
@@ -167,7 +150,7 @@ class TrainingExperiment(BaseExperiment):
 
         return list(splits)
 
-    def collate_fn(self, batch: StationData):
+    def collate_fn(self, batch: UnfoldingData):
         "Perform experiment-specific collation. Can help to avoid CPU-GPU sync during training."
         return batch
 

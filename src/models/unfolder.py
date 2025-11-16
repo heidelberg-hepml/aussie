@@ -9,7 +9,7 @@ from torch.func import functional_call
 
 from src.models.classifier import Classifier
 from src.models.base_model import Model
-from src.utils.datasets import StationData
+from src.datasets import UnfoldingData
 from src.utils.utils import load_model
 
 # log = logging.getLogger("Model")
@@ -24,10 +24,12 @@ class Unfolder(Model):
         self.cfg = cfg
 
         # load pretrained classifier
-        self.classifier, self.cfg_classifier = load_model(self.cfg.cls_path, Classifier)
+        self.classifier, self.cfg_classifier = load_model(
+            self.cfg.cls_path, Classifier, freeze=False
+        )
         self.params_cls = dict(self.classifier.named_parameters())
-        for p in self.classifier.parameters():
-            p.requires_grad = True
+        # for p in self.classifier.parameters():
+        #     p.requires_grad = True
 
         # logging
         self.log_buffer = defaultdict(list)
@@ -39,15 +41,19 @@ class Unfolder(Model):
         if self.bayesian:
             self.register_buffer("train_size", torch.zeros(()))
 
-    def batch_loss(self, batch: StationData):
+    def batch_loss(self, batch: UnfoldingData):
 
-        lw_z = self.net(batch.z_sim).squeeze(-1)
+        # restrict to simulation only
+        batch = batch[batch.labels == 0]
+
+        lw_z = self.net(batch.z).squeeze(-1)
 
         with torch.enable_grad():
-            lw_x = functional_call(self.classifier, self.params_cls, (batch.x_sim,)).squeeze(
+            self.classifier.eval()
+            lw_x = functional_call(self.classifier, self.params_cls, (batch,)).squeeze(
                 -1
             )
-        
+
             match self.cfg.loss:
 
                 case "mse":
@@ -69,7 +75,7 @@ class Unfolder(Model):
         self.log_scalar(loss_gradnorm, "loss_gradnorm")
 
         return loss_gradnorm
-    
+
     @property
     def trainable_parameters(self):
         return (p for p in self.net.parameters() if p.requires_grad)
