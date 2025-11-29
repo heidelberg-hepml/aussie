@@ -1,10 +1,11 @@
 _target_: src.networks.MLP
 dim_in: ???
 dim_out: ???
-hidden_channels: 128
-num_hidden_layers: 2
+hidden_channels: 96
+num_hidden_layers: 4
 act: silu
 out_act: null
 drop: null
 bayesian: false
 bayesian_prior_prec: 1.0
+ensembled: null

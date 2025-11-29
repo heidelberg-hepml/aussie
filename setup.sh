@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 # project directory
-export STATION_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+export AUSSIE_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # modules
 ml purge
@@ -12,7 +12,10 @@ eval "$(conda shell.bash hook)"
 conda activate deep
 
 # auto completion
-eval "$(python station.py -sc install=bash)"
+eval "$(python aussie.py -sc install=bash)"
+
+# complete stacktrace
+export HYDRA_FULL_ERROR=1
 
 # resolve multithreading conflict
 export MKL_THREADING_LAYER=GNU

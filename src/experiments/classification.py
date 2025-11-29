@@ -38,10 +38,16 @@ class ClassificationExperiment(TrainingExperiment):
                 for batch in dataloader
             ]
 
-            predictions["lw_x"].append(torch.cat(lw_x).cpu())
+            predictions["lw_x"].append(
+                torch.cat(lw_x, dim=1 if self.model.ensembled else 0).cpu()
+            )
 
         # stack
-        predictions["lw_x"] = torch.stack(predictions["lw_x"]).numpy()
+        predictions["lw_x"] = (
+            predictions["lw_x"][0]
+            if self.model.ensembled
+            else torch.stack(predictions["lw_x"]).numpy()
+        )
 
         # save to disk
         tag = "" if tag is None else f"_{tag}"
@@ -72,8 +78,12 @@ class ClassificationExperiment(TrainingExperiment):
 
         # observables
         self.log.info("Plotting reco observables")
-        x_dat = test_set[:].x[mask_dat]
-        x_sim = test_set[:].x[mask_sim]
+        if dset.aux_x is None:
+            x_dat = test_set[:].x[mask_dat]
+            x_sim = test_set[:].x[mask_sim]            
+        else:
+            x_dat = test_set[:].aux_x[mask_dat]
+            x_sim = test_set[:].aux_x[mask_sim]
         with PdfPages(os.path.join(savedir, f"observables.pdf")) as pdf:
             for obs in self.process.observables:
                 fig, ax = plotting.plot_reweighting(
@@ -97,8 +107,12 @@ class ClassificationExperiment(TrainingExperiment):
 
         # latents
         self.log.info("Plotting part latents")
-        z_dat = test_set[:].z[mask_dat]
-        z_sim = test_set[:].z[mask_sim]
+        if dset.aux_z is None:
+            z_dat = test_set[:].z[mask_dat]
+            z_sim = test_set[:].z[mask_sim]            
+        else:
+            z_dat = test_set[:].aux_z[mask_dat]
+            z_sim = test_set[:].aux_z[mask_sim]
         with PdfPages(os.path.join(savedir, f"latents.pdf")) as pdf:
             for obs in self.process.observables:
                 fig, ax = plotting.plot_reweighting(

@@ -14,9 +14,6 @@ class TrainingExperiment(BaseExperiment):
 
         # preprocessing and observables
         self.process = instantiate(self.cfg.dataset.process)
-        self.process.transforms = [ # move tenors to device
-            t.to(self.device) for t in self.process.transforms
-        ]
 
         if self.cfg.train or self.cfg.evaluate:
             
@@ -91,17 +88,18 @@ class TrainingExperiment(BaseExperiment):
         # read data
         dset = instantiate(self.cfg.dataset.reader)
 
+        # preprocess (on cpu)
+        for transform in self.process.transforms:
+            # transform = transform.to(dset.device)
+            dset = transform.forward(dset)
+
         # optionally move dataset to gpu
         on_gpu = dcfg.on_gpu and self.cfg.use_gpu
         if on_gpu:
             dset = dset.to(self.device)
 
         self.log.info(f"Read dataset:\n{dset}")
-
-        # preprocess
-        for transform in self.process.transforms:
-            dset = transform.forward(dset)
-
+        
         dsets = self.split_dataset(dset)
 
         # create dataloaders

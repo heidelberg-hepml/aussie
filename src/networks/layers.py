@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from typing import Optional
 
 
@@ -22,6 +23,7 @@ class FeedForward(nn.Module):
         x = self.dropout(x)
         x = self.w2(x)
         return x
+
 
 
 class Attention(nn.Module):
@@ -66,14 +68,16 @@ class Attention(nn.Module):
 
         # dont attend to padded elements
         attn_mask = None if mask is None else mask.view(B, 1, 1, N)
-        x = F.scaled_dot_product_attention(
-            q,
-            k,
-            v,
-            is_causal=self.is_causal,
-            attn_mask=attn_mask,
-            dropout_p=self.drop_attn.p if self.training else 0.0,
-        )
+
+        with sdpa_kernel([SDPBackend.MATH, SDPBackend.EFFICIENT_ATTENTION]):
+            x = F.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                is_causal=self.is_causal,
+                attn_mask=attn_mask,
+                dropout_p=self.drop_attn.p if self.training else 0.0,
+            )
 
         x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
@@ -151,6 +155,37 @@ class BayesianLinear(nn.Module):
             # sample gaussian random numbers
             weight = self.mu_w + s2_w.sqrt() * self.random
             return F.linear(input, weight, self.bias) + 1e-8
-        
+
     def reseed(self):
         self.random = None
+
+
+class StackedLinear(nn.Module):
+    "Efficient implementation of linear layers for ensembles of networks"
+
+    def __init__(self, in_features, out_features, channels, gain=1.0):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.channels = channels
+        self.gain = gain
+        self.weight = nn.Parameter(torch.empty((channels, out_features, in_features)))
+        self.bias = nn.Parameter(torch.empty((channels, out_features)))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for i in range(self.channels):
+
+            # # orig
+            # torch.nn.init.kaiming_uniform_(self.weight[i], a=math.sqrt(5))
+            fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight[i])
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+            torch.nn.init.uniform_(self.bias[i], -bound, bound)
+            
+            # xavier
+            torch.nn.init.xavier_uniform_(self.weight[i], gain=self.gain)
+            
+            # torch.nn.init.xavier_uniform_(self.bias[i], gain=self.gain, generator=None)
+
+    def forward(self, input):
+        return torch.baddbmm(self.bias[:, None, :], input, self.weight.transpose(1, 2))

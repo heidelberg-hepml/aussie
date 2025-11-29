@@ -32,6 +32,7 @@ class TransformerEncoder(nn.Module):
         super().__init__()
         self.dim_in = dim_in
         self.bayesian = bayesian
+        self.ensembled = False # TODO: Implement parallel ensembling
         self.max_len = max_len
         # input/output embeddings
         self.proj_in = nn.Linear(dim_in, hidden_channels)

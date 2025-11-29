@@ -32,6 +32,9 @@ class Model(nn.Module):
         if self.bayesian:
             self.register_buffer("train_size", torch.zeros(()))
 
+        # ensembling
+        self.ensembled = self.net.ensembled
+
     @abstractmethod
     def batch_loss(self, batch: UnfoldingData, training=True):
         pass
@@ -70,6 +73,9 @@ class Model(nn.Module):
         scaler.step(optimizer)
         scaler.update()
 
+        # # zero parameter gradients
+        # optimizer.zero_grad(set_to_none=True)
+        
     def log_scalar(self, x: torch.Tensor, name: str):
         if self.net.training:
             self.log_buffer[name].append(x.detach())

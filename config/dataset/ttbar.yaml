@@ -3,27 +3,8 @@ dim: 16
 reader:
   _target_: src.datasets.ttbarData.read
   path: /remote/gpu02/ore/theofold/data
-  m_dat: 1695
-  m_sim: 1725
+  ms_dat: [1755]
+  ms_sim: [1695, 1725]
 process:
   _target_: src.datasets.ttbarProcess
-
-# name: ttbar
-# dir: /remote/gpu02/ore/theofold/data
-# dim: 12
-# preprocessing:
-#   _target_: src.utils.transforms.ttbarTransform
-#   shift_x:
-#     _target_: torch.tensor
-#     data: [2.5373, 4.9446, 0.0, 0.0]
-#   scale_x:
-#     _target_: torch.tensor
-#     data: [0.5548, 0.6306, 0.8992,  1.8154]
-#   shift_z:
-#     _target_: torch.tensor
-#     data: [2.5477, 4.9820, 0.0, 0.0]
-#   scale_z:
-#     _target_: torch.tensor
-#     data: [0.5357, 0.6244, 0.8988, 1.8153]
-
 

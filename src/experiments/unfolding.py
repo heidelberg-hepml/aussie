@@ -34,13 +34,19 @@ class UnfoldingExperiment(TrainingExperiment):
             lw_z_sim = []
             for batch in dataloader:
 
-                z = batch.z[batch.labels == 0].to(self.device, non_blocking=True)
-                lw_z_sim.append(self.model.net(z).squeeze(-1))
+                batch_sim = batch[batch.labels == 0].to(self.device, non_blocking=True)
+                lw_z_sim.append(self.model(batch_sim).squeeze(-1))
 
-            predictions["lw_z_sim"].append(torch.cat(lw_z_sim).cpu())
+            predictions["lw_z_sim"].append(
+                torch.cat(lw_z_sim, dim=1 if self.model.ensembled else 0).cpu()
+            )
 
         # stack
-        predictions["lw_z_sim"] = torch.stack(predictions["lw_z_sim"]).numpy()
+        predictions["lw_z_sim"] = (
+            predictions["lw_z_sim"][0]
+            if self.model.ensembled
+            else torch.stack(predictions["lw_z_sim"]).numpy()
+        )
 
         # save to disk
         tag = "" if tag is None else f"_{tag}"
@@ -67,15 +73,20 @@ class UnfoldingExperiment(TrainingExperiment):
 
         mask_sim = test_set[:].labels == 0
         mask_dat = ~mask_sim
-        lw_z_sim = record["lw_z_sim"].mean(0)
+        lw_z_sim = record["lw_z_sim"]#.mean(0)
 
         # observables
         self.log.info("Plotting reco observables")
-        x_dat = test_set[:].x[mask_dat]
-        x_sim = test_set[:].x[mask_sim]
+        if dset.aux_x is None:
+            x_dat = test_set[:].x[mask_dat]
+            x_sim = test_set[:].x[mask_sim]            
+        else:
+            x_dat = test_set[:].aux_x[mask_dat]
+            x_sim = test_set[:].aux_x[mask_sim]           
         with PdfPages(os.path.join(savedir, f"observables.pdf")) as pdf:
             for obs in self.process.observables:
                 fig, ax = plotting.plot_reweighting(
+                # fig, ax = plotting.plot_reweighting_ensemble(
                     exp=obs.compute(x_dat).numpy(),
                     sim=obs.compute(x_sim).numpy(),
                     weights_list=[np.exp(lw_z_sim)],
@@ -96,11 +107,16 @@ class UnfoldingExperiment(TrainingExperiment):
 
         # latents
         self.log.info("Plotting part latents")
-        z_dat = test_set[:].z[mask_dat]
-        z_sim = test_set[:].z[mask_sim]
+        if dset.aux_z is None:
+            z_dat = test_set[:].z[mask_dat]
+            z_sim = test_set[:].z[mask_sim]            
+        else:
+            z_dat = test_set[:].aux_z[mask_dat]
+            z_sim = test_set[:].aux_z[mask_sim]
         with PdfPages(os.path.join(savedir, f"latents.pdf")) as pdf:
             for obs in self.process.observables:
                 fig, ax = plotting.plot_reweighting(
+                # fig, ax = plotting.plot_reweighting_ensemble(
                     exp=obs.compute(z_dat).numpy(),
                     sim=obs.compute(z_sim).numpy(),
                     weights_list=[np.exp(lw_z_sim)],

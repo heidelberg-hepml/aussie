@@ -18,8 +18,8 @@ num_bnn_samples: 10
 
 data:
   num: null
-  val_frac: 0.1
-  test_frac: 0.2
+  val_frac: 0.05
+  test_frac: 0.35
   on_gpu: False
 
 training:

@@ -20,20 +20,27 @@ class ttbarData(UnfoldingData):
     def read(
         cls,
         path: str,
-        m_dat: Optional[int] = 1695,
-        m_sim: Optional[int] = 1725,
+        # m_dat: Optional[Tuple[int]] = (1695,),
+        # m_sim: Optional[Tuple[int]] = (1725,),
+        ms_dat: Optional[Tuple[int]] = (1715,),
+        ms_sim: Optional[Tuple[int]] = (1695, 1725, 1735),
         device: Optional[torch.device] = None,
     ):
 
-        assert m_dat != m_sim, "Choose different masses for Sim and Data"
+        # assert m_dat != m_sim, "Choose different masses for Sim and Data"
 
         # read tensors into memory
         batch_size = 0
         tensor_kwargs = defaultdict(list)
-        for i, m in enumerate((m_sim, m_dat)):
+        for i, ms in enumerate((ms_sim, ms_dat)):
             for k, prefix in zip(("x", "z"), ("rec", "gen")):
 
-                arr = np.load(os.path.join(path, f"{prefix}_{m}_delphes.npy"))
+                arr = np.concatenate(
+                    [
+                        np.load(os.path.join(path, f"{prefix}_{m}_delphes.npy"))
+                        for m in ms
+                    ]
+                )
                 arr = cartesian2jet(arr.reshape(-1, 3, 4))
 
                 tensor = torch.from_numpy(arr).float()
@@ -57,10 +64,18 @@ class ttbarProcess:
     transforms: Tuple[Callable] = (
         ttbarTransform(
             # fmt: off
-            shift_x=torch.tensor([2.95, 5.58, 0.0, 0.0, 13.64, 147.52, 0.0, 0.0, 9.24, 80.88, 0.0, 0.0, 4.65, 4.56, 4.36, 5.14,]),
-            scale_x=torch.tensor([0.43, 0.25, 0.87, 1.81, 6.00, 47.83, 0.90, 1.81, 4.17, 34.36, 0.93, 1.81, 0.31, 0.32, 0.35, 0.18,]),
-            shift_z=torch.tensor([2.93, 5.61, 0.00, 0.00, 13.81, 153.26, 0.00, 0.00, 9.57, 84.52, 0.00, 0.00, 4.68, 4.59, 4.40, 5.17,]),
-            scale_z=torch.tensor([0.45, 0.26, 0.87, 1.82, 6.24, 49.72, 0.90, 1.82, 4.28, 35.81, 0.94, 1.81, 0.31, 0.32, 0.35, 0.18,]),
+            # shift_x=torch.tensor([2.95, 5.58, 0.0, 0.0, 13.64, 147.52, 0.0, 0.0, 9.24, 80.88, 0.0, 0.0, 4.65, 4.56, 4.36, 5.14,]),
+            # scale_x=torch.tensor([0.43, 0.25, 0.87, 1.81, 6.00, 47.83, 0.90, 1.81, 4.17, 34.36, 0.93, 1.81, 0.31, 0.32, 0.35, 0.18,]),
+            # shift_z=torch.tensor([2.93, 5.61, 0.00, 0.00, 13.81, 153.26, 0.00, 0.00, 9.57, 84.52, 0.00, 0.00, 4.68, 4.59, 4.40, 5.17,]),
+            # scale_z=torch.tensor([0.45, 0.26, 0.87, 1.82, 6.24, 49.72, 0.90, 1.82, 4.28, 35.81, 0.94, 1.81, 0.31, 0.32, 0.35, 0.18,]),
+            shift_x=torch.tensor([2.9543e+00, 5.5877e+00, 0.0, 0.0, 2.5239e+00, 4.9391e+00, 0., 0., 2.1269e+00,  4.3051e+00, 0.0, 0.0, 1.1114e+02,  1.0132e+02,  8.3750e+01, 1.7519e+02]), # no arcsinh
+            scale_x=torch.tensor([0.4388,  0.2597,  0.8748,  1.8155,  0.4442,  0.3447,  0.9006,  1.8154, 0.4913,  0.4273,  0.9358,  1.8150, 38.3674, 33.2910, 29.1574, 38.8061]),
+            shift_z=torch.tensor([2.9354e+00, 5.6162e+00, 0.0, 0.0, 2.5350e+00, 4.9778e+00, 0.0, 0.0, 2.1678e+00,  4.3499e+00, 0.0, 0.0, 1.1389e+02,  1.0457e+02,  8.6874e+01, 1.8061e+02]),
+            scale_z=torch.tensor([0.4501,  0.2619,  0.8746,  1.8156,  0.4328,  0.3425,  0.8998,  1.8154, 0.4463,  0.4259,  0.9355,  1.8148, 39.8243, 34.4782, 29.9042, 40.2218]),
+            # shift_x=torch.tensor([2.9543e+00, 5.5877e+00, 0.0, 0.0, 2.5239e+00, 4.9391e+00, 0., 0., 2.1269e+00,  4.3051e+00, 0.0, 0.0, 2.6934e+00,  1.9430e+00,  1.1314e-01, -5.5757e-01]), # arcsinh
+            # scale_x=torch.tensor([0.4388,  0.2597,  0.8748,  1.8155,  0.4442,  0.3447,  0.9006,  1.8154, 0.4913,  0.4273,  0.9358,  1.8150, 2.7796, 3.1538, 3.4341, 3.3587]),
+            # shift_z=torch.tensor([2.9354e+00, 5.6162e+00, 0.0, 0.0, 2.5350e+00, 4.9778e+00, 0.0, 0.0, 2.1678e+00,  4.3499e+00, 0.0, 0.0, 2.9341e+00,  2.2679e+00,  5.1929e-01, 1.5454e-01]),
+            # scale_z=torch.tensor([0.4501,  0.2619,  0.8746,  1.8156,  0.4328,  0.3425,  0.8998,  1.8154, 0.4463,  0.4259,  0.9355,  1.8148, 2.5372, 2.9484, 3.3461, 3.0972]),            
             # fmt: on
         ),
     )
@@ -163,6 +178,7 @@ class ttbarProcess:
         ),
     )
 
+
 def compute_inv_mass(p, particles) -> torch.Tensor:
 
     px_sum = 0
@@ -190,6 +206,7 @@ def compute_inv_mass(p, particles) -> torch.Tensor:
         torch.clamp((e_sum) ** 2 - (px_sum) ** 2 - (py_sum) ** 2 - (pz_sum) ** 2, min=0)
     )
     return m
+
 
 # def compute_inv_mass(p, particles) -> np.array:
 

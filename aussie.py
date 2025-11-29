@@ -9,7 +9,7 @@ from omegaconf import DictConfig
 from src.utils.cluster import submit
 from src.utils.config import update_config_from_prev, check_cfg
 
-log = logging.getLogger("STATION")
+log = logging.getLogger("AUSSIE")
 
 @hydra.main(config_path="config", config_name="rerun", version_base=None)
 def main(cfg: DictConfig):

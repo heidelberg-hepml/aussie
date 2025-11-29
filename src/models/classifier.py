@@ -17,28 +17,26 @@ class Classifier(Model):
         logits = self.forward(batch).squeeze(-1)
 
         # split by labels to handle imbalanced classes
-        logits_sim = logits[batch.labels == 0]
-        logits_dat = logits[batch.labels == 1]
+        logits_sim = logits[..., batch.labels == 0]  # ensembling
+        logits_dat = logits[..., batch.labels == 1]  # ensembling
 
+        mean_dims = (0, 1) if self.ensembled else 0
         match self.cfg.loss:
 
             case "bce":
                 loss = (
                     F.binary_cross_entropy_with_logits(
                         logits_dat, torch.ones_like(logits_dat), reduction="none"
-                    ).mean(0)
+                    ).mean(mean_dims)
                     + F.binary_cross_entropy_with_logits(
                         logits_sim, torch.zeros_like(logits_sim), reduction="none"
-                    ).mean(0)
+                    ).mean(mean_dims)
                 ) / 2
             case "mlc":
                 loss = (
-                    (logits_sim + logits_sim.exp()).mean(0)
-                    + (-logits_dat + (-logits_dat).exp()).mean(0)
+                    (logits_sim + logits_sim.exp()).mean(mean_dims)
+                    + (-logits_dat + (-logits_dat).exp()).mean(mean_dims)
                 ) / 2
-                # sign = 1 - 2 * labels
-                # z = sign * logits
-                # loss = z + z.exp()
             case _:
                 raise ValueError
 
@@ -55,6 +53,10 @@ class Classifier(Model):
 
     def forward(self, batch: UnfoldingData) -> torch.Tensor:
         """Return the reco-level data-to-sim log-likelihood ratio"""
+
+        if self.lowlevel:
+            return self.net(batch.x, mask=batch.x[..., 0] != 0)
+
         return self.net(batch.x)
 
     def weight(self, batch: UnfoldingData) -> torch.Tensor:

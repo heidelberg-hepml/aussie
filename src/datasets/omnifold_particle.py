@@ -1,6 +1,7 @@
 import importlib
 import numpy as np
 import torch
+import torch.nn.functional as F
 import warnings
 
 from collections import defaultdict
@@ -10,11 +11,11 @@ from typing import Callable, Tuple, Optional
 
 from src.datasets.base_dataset import UnfoldingData
 from src.utils.observable import Observable
-from src.utils.transforms import OmniFoldTransform
+from src.utils.transforms import OmniFoldParticleTransform
 
 
 @tensorclass
-class OmniFoldData(UnfoldingData):
+class OmniFoldParticleData(UnfoldingData):
 
     @classmethod
     def read(
@@ -22,13 +23,12 @@ class OmniFoldData(UnfoldingData):
         path: str,
         num: Optional[int] = None,
         device: Optional[torch.device] = None,
-        exclusions=("particles", "Zs", "lhas"),
     ):
 
         ef = importlib.import_module("energyflow")
 
         # read tensors into memory
-        load_kwargs = dict(num_data=num or -1, exclude_keys=exclusions, cache_dir=path)
+        load_kwargs = dict(num_data=num or -1, cache_dir=path, pad=True)
 
         dicts = [
             ef.zjets_delphes.load("Pythia21", **load_kwargs),  # "Sim"
@@ -39,18 +39,15 @@ class OmniFoldData(UnfoldingData):
         tensor_kwargs = defaultdict(list)
         for i, d in enumerate(dicts):
 
-            mask = (  # avoid divide by zero and log(zero)
-                (d[f"gen_widths"] != 0)
-                & (d[f"sim_widths"] != 0)
-                & (d[f"gen_sdms"] > 0)
-                & (d[f"sim_sdms"] > 0)
-            )
-
             for k, prefix in zip(("x", "z"), ("sim", "gen")):
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", RuntimeWarning)
-                    # fmt: off
-                    tensor = torch.from_numpy(
+
+                tensor = torch.from_numpy(d[f"{prefix}_particles"]).float()
+                max_particles = tensor.size(1)
+                tensor_kwargs[k].append(F.pad(tensor, (0, 0, 0, 152 - max_particles)))
+
+                tensor_kwargs[f"aux_{k}"].append(
+                    torch.from_numpy(
+                        # fmt: off
                         np.stack([
                             d[f"{prefix}_jets"][:, -1] ,                                 # mass
                             d[f"{prefix}_mults"],                                        # mult
@@ -58,12 +55,12 @@ class OmniFoldData(UnfoldingData):
                             d[f"{prefix}_tau2s"] / d[f"{prefix}_widths"],                # tau_21
                             2 * np.log(d[f"{prefix}_sdms"] / d[f"{prefix}_jets"][:, 0]), # ln_rho
                             d[f"{prefix}_zgs"],                                          # zg
-                        ], axis=1)[mask]
+                        ], axis=1)
+                        # fmt: on
                     ).float()
-                    # fmt: on
-                size = len(tensor)
-                tensor_kwargs[k].append(tensor)
+                )
 
+            size = len(tensor)
             batch_size += size
             tensor_kwargs["labels"].append(torch.full([size], i, dtype=torch.float32))
 
@@ -75,14 +72,14 @@ class OmniFoldData(UnfoldingData):
 
 
 @dataclass
-class OmniFoldProcess:
+class OmniFoldParticleProcess:
     num_features: int = 6
     transforms: Tuple[Callable] = (
-        OmniFoldTransform(
-            shift_x=torch.tensor([2.7727, 2.8380, -2.0688, -0.4431, -6.7655, 0.2401]),
-            scale_x=torch.tensor([0.5247, 0.4587, 0.6379, 0.3688, 2.3824, 0.1188]),
-            shift_z=torch.tensor([2.9788, 3.1999, -2.2242, -0.3680, -7.0247, 0.2337]),
-            scale_z=torch.tensor([0.4525, 0.3994, 0.6832, 0.3327, 2.3020, 0.1152]),
+        OmniFoldParticleTransform(
+            shift_x=torch.tensor([-2.9831, 0.0, 0.0, 0.0]),
+            scale_x=torch.tensor([1.2479, 0.1128, 0.1169, 1.0]),
+            shift_z=torch.tensor([-3.6219, 0.0, 0.0, 0.0]),
+            scale_z=torch.tensor([1.6644, 0.1283, 0.1278, 1.0]),
         ),
     )
     observables: Tuple[Observable] = (

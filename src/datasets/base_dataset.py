@@ -16,6 +16,8 @@ class UnfoldingData:
 
     x: Optional[torch.Tensor] = None
     z: Optional[torch.Tensor] = None
+    aux_x: Optional[torch.Tensor] = None
+    aux_z: Optional[torch.Tensor] = None
     labels: Optional[torch.Tensor] = None
 
     @classmethod
