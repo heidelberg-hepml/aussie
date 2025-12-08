@@ -25,20 +25,18 @@ class TransformerEncoder(nn.Module):
         drop_mlp: float = 0.0,
         bayesian: bool = False,
         max_len: int = 100,
-        pos_dim: int = 5
-
+        pos_dim: int = 5,
+        head: Optional[torch.nn.Module] = None,
     ):
 
         super().__init__()
         self.dim_in = dim_in
         self.bayesian = bayesian
-        self.ensembled = False # TODO: Implement parallel ensembling
+        self.ensembled = False  # TODO: Implement parallel ensembling
         self.max_len = max_len
         # input/output embeddings
         self.proj_in = nn.Linear(dim_in, hidden_channels)
-        self.proj_out = (BayesianLinear if bayesian else nn.Linear)(
-            hidden_channels, dim_out
-        )
+        self.head = head
 
         # init condition embedding if needed to bridge dimensions
         self.conditional = dim_cond is not None
@@ -83,12 +81,15 @@ class TransformerEncoder(nn.Module):
         # x = x + pos_enc
         x = self.proj_in(x)
 
-
         if self.conditional:
             # append condition as token
             c = self.proj_cond(c).unsqueeze(1)
             x = torch.cat([c, x], dim=1)
             mask = F.pad(mask, (1, 0), value=1)
+        elif c is not None:
+            raise RuntimeError(
+                "Received condition in `TransformerEncoder.forward`, but `dim_cond` not provided at initialization"
+            )
 
         # forward pass through transformer stack
         for block in self.blocks:
@@ -100,7 +101,9 @@ class TransformerEncoder(nn.Module):
 
         # norm and project output
         x = self.out_norm(x)
-        x = self.proj_out(x)
+
+        if self.head is not None:
+            x = self.head(x)
 
         return x
 

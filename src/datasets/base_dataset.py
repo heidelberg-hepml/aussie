@@ -4,6 +4,7 @@ from abc import abstractmethod
 from tensordict import tensorclass
 from typing import Optional
 
+
 @tensorclass
 class UnfoldingData:
     """
@@ -18,7 +19,13 @@ class UnfoldingData:
     z: Optional[torch.Tensor] = None
     aux_x: Optional[torch.Tensor] = None
     aux_z: Optional[torch.Tensor] = None
+    cond_x: Optional[torch.Tensor] = None
+    cond_z: Optional[torch.Tensor] = None
+    mask_x: Optional[torch.Tensor] = None
+    mask_z: Optional[torch.Tensor] = None
+    conds: Optional[torch.Tensor] = None
     labels: Optional[torch.Tensor] = None
+    sample_weights: Optional[torch.Tensor] = None
 
     @classmethod
     @abstractmethod

@@ -9,7 +9,7 @@ experiment: UnfoldingExperiment
 cls_path: ???
 
 loss: mlc
-norm: l1
+norm: l2
 bayesian: false
 
 model:
@@ -24,6 +24,7 @@ training:
   lr: 1e-3
   epochs: 500
   batch_size: 4096
+  test_batch_size: ${training.batch_size}
   patience: 50
 
 data:

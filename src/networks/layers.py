@@ -4,9 +4,8 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
-from torch.nn.attention import SDPBackend, sdpa_kernel
+from jvp_flash_attention.jvp_attention import attention as jvp_attention
 from typing import Optional
-
 
 class FeedForward(nn.Module):
     def __init__(self, dim, mult=4, dropout=0.0):
@@ -67,17 +66,27 @@ class Attention(nn.Module):
         q, k = self.q_norm(q), self.k_norm(k)
 
         # dont attend to padded elements
-        attn_mask = None if mask is None else mask.view(B, 1, 1, N)
+        attn_mask = None if mask is None else mask.view(B, 1, 1, N).expand(-1, self.num_heads, N, -1)
 
-        with sdpa_kernel([SDPBackend.MATH, SDPBackend.EFFICIENT_ATTENTION]):
-            x = F.scaled_dot_product_attention(
-                q,
-                k,
-                v,
-                is_causal=self.is_causal,
-                attn_mask=attn_mask,
-                dropout_p=self.drop_attn.p if self.training else 0.0,
-            )
+        # with sdpa_kernel(SDPBackend.MATH): # for second derivatives
+        #     x = F.scaled_dot_product_attention(
+        #         q,
+        #         k,
+        #         v,
+        #         is_causal=self.is_causal,
+        #         attn_mask=attn_mask,
+        #         dropout_p=self.drop_attn.p if self.training else 0.0,
+        #     )
+
+        x = jvp_attention(
+            q,
+            k,
+            v,
+            attn_mask=attn_mask,
+            causal=self.is_causal,
+            dropout_p=self.drop_attn.p if self.training else 0.0,
+        )
+
 
         x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)

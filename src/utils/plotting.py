@@ -12,7 +12,7 @@ pyplot_cfg = {
     "legend.fontsize": 12,
     "figure.subplot.top": 0.95,
     "figure.subplot.bottom": 0.15,
-    "figure.subplot.left": 0.14,
+    "figure.subplot.left": 0.15,
     "figure.subplot.right": 0.96,
     "savefig.pad_inches": 0.1,
     "savefig.dpi": 300,
@@ -154,6 +154,7 @@ def plot_reweighting(
     ratio_lims=(0.85, 1.15),
     density=True,
     add_chi2=True,
+    add_legend=True,
     exp_weights=None,
 ):
 
@@ -270,7 +271,12 @@ def plot_reweighting(
             step="post",
             facecolor=color,
         )
-        ratio_scale = denom.sum() / y.sum() if density else 1
+        # ratio_scale = denom.sum() / y.sum() if density else 1
+        ratio_scale = (
+            1
+            if not density
+            else denom.sum() / y_sim.sum() if (label in labels_rew) else denom.sum() / y.sum()
+        )
         ratio_ax.step(
             bins,
             dup_last(y / denom) * ratio_scale,
@@ -310,15 +316,16 @@ def plot_reweighting(
     ratio_ax.set_ylabel("Ratio")
     ratio_ax.set_xlabel(xlabel)
 
-    main_ax.legend(
-        legend_objs,
-        legend_labels,
-        frameon=False,
-        handlelength=1.4,
-        # ncols=3,
-        columnspacing=0.5,
-        # loc="upper center",
-    )
+    if add_legend:
+        main_ax.legend(
+            legend_objs,
+            legend_labels,
+            frameon=False,
+            handlelength=1.4,
+            # ncols=3,
+            columnspacing=0.5,
+            # loc="upper center",
+        )
 
     if title is not None:
         main_ax.set_title(title)
@@ -717,7 +724,11 @@ def plot_reweighting_ensemble(
             step="post",
             facecolor=color,
         )
-        ratio_scale = denom.sum() / y.sum() if density else 1
+        ratio_scale = (
+            1
+            if not density
+            else denom.sum() / y_sim.sum() if (label in labels_rew) else denom.sum() / y.sum()
+        )
         ratio_ax.step(
             bins,
             dup_last(y / denom) * ratio_scale,

@@ -22,6 +22,7 @@ class OmniFoldData(UnfoldingData):
         path: str,
         num: Optional[int] = None,
         device: Optional[torch.device] = None,
+        correction_weights: Optional[str] = None,
         exclusions=("particles", "Zs", "lhas"),
     ):
 
@@ -38,6 +39,9 @@ class OmniFoldData(UnfoldingData):
         batch_size = 0
         tensor_kwargs = defaultdict(list)
         for i, d in enumerate(dicts):
+
+            if correction_weights is not None:  # correct for hidden-variable effects
+                d = dicts[0]  # always select Pythia
 
             mask = (  # avoid divide by zero and log(zero)
                 (d[f"gen_widths"] != 0)
@@ -63,6 +67,13 @@ class OmniFoldData(UnfoldingData):
                     # fmt: on
                 size = len(tensor)
                 tensor_kwargs[k].append(tensor)
+
+            # construct correction weights for data
+            tensor_kwargs["sample_weights"].append(
+                torch.from_numpy(np.load(correction_weights)).float()
+                if (correction_weights and i)
+                else torch.full([size], 1, dtype=torch.float32)
+            )
 
             batch_size += size
             tensor_kwargs["labels"].append(torch.full([size], i, dtype=torch.float32))
@@ -90,6 +101,7 @@ class OmniFoldProcess:
             name="mass",
             compute=lambda x: x[..., 0],
             label=r"$\text{Jet mass } m$",
+            logy=True,
             xlims=(1, 60),
         ),
         Observable(
@@ -103,6 +115,7 @@ class OmniFoldProcess:
             name="width",
             compute=lambda x: x[..., 2],
             label=r"$\text{Jet width } w$",
+            logy=True,
             xlims=(0, 0.6),
         ),
         Observable(

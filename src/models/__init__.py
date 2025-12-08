@@ -1,2 +1,2 @@
-from .classifier import Classifier
+from .classifier import Classifier, PartClassifier
 from .unfolder import Unfolder, OmniFolder

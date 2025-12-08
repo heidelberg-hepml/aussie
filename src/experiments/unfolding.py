@@ -67,31 +67,42 @@ class UnfoldingExperiment(TrainingExperiment):
         dset = instantiate(self.cfg.dataset.reader)  # TODO: Just use test loader
         _, _, test_set = self.split_dataset(dset)
 
-        # read predicted weights
         self.log.info("Reading predictions from disk")
+        # unfolding weights
         record = np.load(os.path.join(self.exp_dir, "predictions.npz"))
+        # classifier weights
+        record_cls = np.load(os.path.join(self.cfg.cls_path, "predictions.npz"))
 
+        # select simulation only
         mask_sim = test_set[:].labels == 0
         mask_dat = ~mask_sim
-        lw_z_sim = record["lw_z_sim"]#.mean(0)
+        lw_z_sim = record["lw_z_sim"]  # .mean(0)
+        lw_x_sim = record_cls["lw_x"][..., mask_sim.numpy()]
+
+        # # read correction weights
+        # correction_weights = test_set[:].sample_weights[mask_dat].numpy()
+        # read correction weights
+        correction_weights = test_set[:].sample_weights
+        if correction_weights is not None:
+            correction_weights = correction_weights[mask_dat].numpy()
 
         # observables
         self.log.info("Plotting reco observables")
         if dset.aux_x is None:
             x_dat = test_set[:].x[mask_dat]
-            x_sim = test_set[:].x[mask_sim]            
+            x_sim = test_set[:].x[mask_sim]
         else:
             x_dat = test_set[:].aux_x[mask_dat]
-            x_sim = test_set[:].aux_x[mask_sim]           
+            x_sim = test_set[:].aux_x[mask_sim]
         with PdfPages(os.path.join(savedir, f"observables.pdf")) as pdf:
             for obs in self.process.observables:
                 fig, ax = plotting.plot_reweighting(
-                # fig, ax = plotting.plot_reweighting_ensemble(
+                    # fig, ax = plotting.plot_reweighting_ensemble(
                     exp=obs.compute(x_dat).numpy(),
                     sim=obs.compute(x_sim).numpy(),
-                    weights_list=[np.exp(lw_z_sim)],
-                    variance_list=[None],
-                    names_list=["Unfolder"],
+                    weights_list=[np.exp(lw_z_sim), np.exp(lw_x_sim)],
+                    variance_list=[None, None],
+                    names_list=["Unfolder", "Classifier"],
                     # xlabel=pcfg.obs_labels[i],
                     xlabel=obs.label,
                     figsize=np.array([1, 5 / 6]) * pw / 2,
@@ -100,7 +111,7 @@ class UnfoldingExperiment(TrainingExperiment):
                     logy=obs.logy,
                     qlims=obs.qlims,
                     xlims=obs.xlims,
-                    # exp_weights=exp_weights,
+                    exp_weights=correction_weights,
                 )
                 pdf.savefig(fig)
                 plt.close(fig)
@@ -109,19 +120,19 @@ class UnfoldingExperiment(TrainingExperiment):
         self.log.info("Plotting part latents")
         if dset.aux_z is None:
             z_dat = test_set[:].z[mask_dat]
-            z_sim = test_set[:].z[mask_sim]            
+            z_sim = test_set[:].z[mask_sim]
         else:
             z_dat = test_set[:].aux_z[mask_dat]
             z_sim = test_set[:].aux_z[mask_sim]
         with PdfPages(os.path.join(savedir, f"latents.pdf")) as pdf:
             for obs in self.process.observables:
                 fig, ax = plotting.plot_reweighting(
-                # fig, ax = plotting.plot_reweighting_ensemble(
+                    # fig, ax = plotting.plot_reweighting_ensemble(
                     exp=obs.compute(z_dat).numpy(),
                     sim=obs.compute(z_sim).numpy(),
-                    weights_list=[np.exp(lw_z_sim)],
-                    variance_list=[None],
-                    names_list=["Unfolder"],
+                    weights_list=[np.exp(lw_z_sim), np.exp(lw_x_sim)],
+                    variance_list=[None, None],
+                    names_list=["AUSSIE", "OmniFold"],
                     # xlabel=pcfg.obs_labels[i],
                     xlabel=obs.label,
                     figsize=np.array([1, 5 / 6]) * pw / 2,
@@ -130,7 +141,7 @@ class UnfoldingExperiment(TrainingExperiment):
                     logy=obs.logy,
                     qlims=obs.qlims,
                     xlims=obs.xlims,
-                    # exp_weights=exp_weights,
+                    exp_weights=correction_weights,
                 )
                 pdf.savefig(fig)
                 plt.close(fig)

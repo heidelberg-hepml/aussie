@@ -1,0 +1,11 @@
+defaults:
+  - /cls
+  - _self_
+
+net:
+  ensembled: 64
+
+training:
+  optimizer:
+    warmup_steps: 5000
+    weight_decay: 0.03

@@ -49,7 +49,7 @@ class Unfolder(Model):
         """Return the part-level data-to-sim log-likelihood ratio"""
 
         if self.lowlevel:
-            return self.net(batch.z, mask=batch.z[..., 0] != 0)
+            return self.net(batch.z, c=batch.cond_z, mask=batch.mask_z)
 
         return self.net(batch.z)
 
@@ -76,21 +76,22 @@ class Unfolder(Model):
                 lw_x = lw_x.mean(0)
 
             # calculate regression loss
-            batch_dim = int(bool(self.ensembled))
             match self.cfg.loss:
 
                 case "mse":
-                    loss_reg = (lw_z - lw_x).pow(2).mean(batch_dim)
+                    loss_reg = (lw_z - lw_x).pow(2)
                 case "mse2":
-                    loss_reg = (lw_z.exp() - lw_x.exp()).pow(2).mean(batch_dim)
+                    loss_reg = (lw_z.exp() - lw_x.exp()).pow(2)
                 case "bce":
                     loss_reg = (
                         (lw_z.exp() + 1) * torch.nn.functional.softplus(-lw_x) + lw_x
-                    ).mean(batch_dim) / 2
-                case "mlc":
-                    loss_reg = (-lw_z.exp() * lw_x - (1 - lw_x.exp())).mean(
-                        batch_dim
                     ) / 2
+                case "mlc":
+                    loss_reg = (-lw_z.exp() * lw_x - (1 - lw_x.exp())) / 2
+
+            batch_dim = int(bool(self.ensembled))
+            # .multiply(batch.sample_weights) # not needed assuming only data gets corrected
+            loss_reg = loss_reg.mean(batch_dim)
 
             # take gradients (in parallel if ensembled)
             grad_outputs = (
@@ -110,18 +111,21 @@ class Unfolder(Model):
         match self.cfg.norm:
 
             case "l1":
-                loss_gradnorm = sum(g.abs().sum() for g in grads_x)
+                loss_gradnorm = sum(g.abs().mean() for g in grads_x)
             case "l2":
-                loss_gradnorm = sum(g.pow(2).sum() for g in grads_x)
-
-        # normalize result
-        num_params = sum(w.numel() for w in self.params_cls.values())
-        loss_gradnorm = loss_gradnorm / num_params  # don't divide by self.ensembled
+                loss_gradnorm = sum(g.pow(2).mean() for g in grads_x)
 
         self.log_scalar(loss_reg, "loss_reg")
         self.log_scalar(loss_gradnorm, "loss_gradnorm")
 
-        return loss_gradnorm * 1e6
+        # scale result
+        loss_gradnorm = loss_gradnorm * 1e3
+        if self.ensembled:
+            loss_gradnorm = (
+                loss_gradnorm * self.ensembled
+            )  # such that lr scale is independent of ensemble size
+
+        return loss_gradnorm
 
     @property
     def trainable_parameters(self):
@@ -160,7 +164,7 @@ class OmniFolder(Model):
         """Return the part-level data-to-sim log-likelihood ratio"""
 
         if self.lowlevel:
-            return self.net(batch.z, mask=batch.z[..., 0] != 0)
+            return self.net(batch.z, c=batch.cond_z, mask=batch.mask_z)
 
         return self.net(batch.z)
 
@@ -201,3 +205,81 @@ class OmniFolder(Model):
     @property
     def trainable_parameters(self):
         return (p for p in self.net.parameters() if p.requires_grad)
+
+
+class RKHSUnfolder(Unfolder):
+
+    def init__(self, cfg: DictConfig):
+        super().init(cfg)
+        self.kernel = torch.distributions.Normal(loc=0.0, scale=cfg.kernel_scale)
+
+    # def rbf_kernel_matrix(self, X, Y=None, lengthscale=1.0):
+    #     # X: (N, d), Y: (M, d) or None
+    #     if Y is None:
+    #         Y = X
+    #     X_sq = (X**2).sum(dim=1, keepdim=True)  # (N,1)
+    #     Y_sq = (Y**2).sum(dim=1, keepdim=True)  # (M,1)
+    #     # pairwise squared distances: (N, M)
+    #     dist2 = X_sq - 2.0 * X @ Y.t() + Y_sq.t()
+    #     K = torch.exp(-0.5 * dist2 / (lengthscale**2))
+    #     return K
+
+    def rbf_kernel_matrix(self, X, Y=None, lengthscale=1.0, eps=1e-8):
+        """
+        Compute RBF (Gaussian) kernel matrix between X and Y:
+        K_ij = exp(-0.5 * ||x_i - y_j||^2 / lengthscale^2)
+        X: (N, d)
+        Y: (M, d) or None -> Y = X
+        Returns: (N, M)
+        """
+        if Y is None:
+            Y = X
+        # squared norms
+        X_sq = (X * X).sum(dim=1, keepdim=True)  # (N,1)
+        Y_sq = (Y * Y).sum(dim=1, keepdim=True)  # (M,1)
+        # pairwise squared distance: (N, M)
+        dist2 = X_sq - 2.0 * (X @ Y.t()) + Y_sq.t()
+        # numerical stability: clamp small negatives to zero
+        dist2 = torch.clamp(dist2, min=0.0)
+        K = torch.exp(-0.5 * dist2 / (lengthscale**2 + eps))
+        return K
+
+    def batch_loss(self, batch: UnfoldingData):
+
+        # restrict to simulation only
+        batch = batch[batch.labels == 0]
+
+        # forward pass classifier
+        with torch.no_grad():
+            lw_x = self.classifier(batch)
+
+        if self.classifier.ensembled:
+            lw_x = lw_x.mean(0)
+
+        # print(f"{lw_x.shape=}")
+
+        # forward pass unfolder
+        lw_z = self.forward(batch)
+        # print(f"{lw_z.shape=}")
+
+        # compute residuals
+        r = 1 - (lw_z - lw_x).clamp(-3, 3).exp()  # .unsqueeze(1)  # (N,1)
+        # r = lw_x.exp() - lw_z.exp()  # .unsqueeze(1)  # (N,1)
+        # r = r.clamp(max=100)
+
+        # print(f"{r.shape=}")
+
+        # compute kernel matrix K (N,N)
+        K = self.rbf_kernel_matrix(batch.x, None, lengthscale=self.cfg.scale)  # (N,N)
+        K.diagonal().zero_()
+
+        # empirical RKHS quadratic loss: (1/N^2) r^T K r
+        # r^T K r = sum_{i,j} r_i K_ij r_j
+        # implement as (r.T @ K @ r) scalar
+        B = len(batch)
+        loss_quad = (r.t() @ K @ r).squeeze() / (B * (B - 1))
+
+        self.log_scalar(r.mean(), "r2_mean")
+        self.log_scalar(K.sum() / (B * (B - 1)), "kernel_mean")
+
+        return loss_quad

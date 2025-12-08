@@ -5,6 +5,7 @@ from src.models.base_model import Model
 from src.networks import TransformerEncoder
 from src.datasets import UnfoldingData
 
+
 class Classifier(Model):
 
     @property
@@ -17,31 +18,33 @@ class Classifier(Model):
         logits = self.forward(batch).squeeze(-1)
 
         # split by labels to handle imbalanced classes
-        logits_sim = logits[..., batch.labels == 0]  # ensembling
-        logits_dat = logits[..., batch.labels == 1]  # ensembling
+        mask_sim = batch.labels == 0
+        logits_sim = logits[..., mask_sim]  # ellipsis to handle ensembling
+        logits_dat = logits[..., ~mask_sim]
 
-        mean_dims = (0, 1) if self.ensembled else 0
         match self.cfg.loss:
 
             case "bce":
-                loss = (
-                    F.binary_cross_entropy_with_logits(
-                        logits_dat, torch.ones_like(logits_dat), reduction="none"
-                    ).mean(mean_dims)
-                    + F.binary_cross_entropy_with_logits(
-                        logits_sim, torch.zeros_like(logits_sim), reduction="none"
-                    ).mean(mean_dims)
-                ) / 2
+                loss_dat = F.binary_cross_entropy_with_logits(
+                    logits_dat, torch.ones_like(logits_dat), reduction="none"
+                )
+                loss_sim = F.binary_cross_entropy_with_logits(
+                    logits_sim, torch.zeros_like(logits_sim), reduction="none"
+                )
             case "mlc":
-                loss = (
-                    (logits_sim + logits_sim.exp()).mean(mean_dims)
-                    + (-logits_dat + (-logits_dat).exp()).mean(mean_dims)
-                ) / 2
+                loss_dat = -logits_dat + (-logits_dat).exp()
+                loss_sim = logits_sim + logits_sim.exp()
             case _:
                 raise ValueError
 
-        # if batch.data_weights is not None:
-        #     loss = loss * batch.data_weights
+        # correction weights
+        correction = batch.sample_weights
+        if correction is not None:
+            loss_dat = loss_dat * correction[~mask_sim]
+
+        # average loss
+        mean_dims = (0, 1) if self.ensembled else 0
+        loss = (loss_dat.mean(mean_dims) + loss_sim.mean(mean_dims)) / 2
 
         if self.bayesian:
             kld = self.kld / self.train_size
@@ -55,7 +58,7 @@ class Classifier(Model):
         """Return the reco-level data-to-sim log-likelihood ratio"""
 
         if self.lowlevel:
-            return self.net(batch.x, mask=batch.x[..., 0] != 0)
+            return self.net(batch.x, c=batch.cond_x, mask=batch.mask_x)
 
         return self.net(batch.x)
 
@@ -68,3 +71,14 @@ class Classifier(Model):
         """Return event-level data probabilities"""
         logits = self.forward(batch)
         return logits.sigmoid()
+
+
+class PartClassifier(Classifier):
+
+    def forward(self, batch: UnfoldingData) -> torch.Tensor:
+        """Return the reco-level data-to-sim log-likelihood ratio"""
+
+        if self.lowlevel:
+            return self.net(batch.z, c=batch.cond_z, mask=batch.mask_z)
+
+        return self.net(batch.z)

@@ -2,6 +2,7 @@
 
 import hydra
 import importlib
+import os
 import logging
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
@@ -22,6 +23,7 @@ def main(cfg: DictConfig):
 
     # resolve config if loading previous experiment
     if cfg.prev_exp_dir:
+        assert os.path.exists(exp_dir)
         cfg = update_config_from_prev(cfg, hcfg, exp_dir)
 
     # check cfg

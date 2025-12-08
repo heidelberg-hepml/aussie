@@ -1,0 +1,12 @@
+defaults:
+  - /unf
+  - _self_
+
+net:
+  ensembled: 20
+
+training:
+  lr: 5e-3
+  optimizer:
+    warmup_steps: 5000
+    betas: [0.95,0.999]

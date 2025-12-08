@@ -1,0 +1,26 @@
+defaults:
+  - /unf
+  - override net: transformer2
+  - override dataset: omnifold_particle
+  - _self_
+
+norm: l1
+
+data:
+  on_gpu: false
+  
+dataset:
+  reader:
+    use_cond: True
+  process:
+    _target_: src.datasets.OmniFoldParticleCondProcess
+
+net:
+  dim_cond: 4
+  
+training:
+  lr: 0.001
+  batch_size: 256
+  optimizer:
+    warmup_steps: 5000
+    weight_decay: 0.0

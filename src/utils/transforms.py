@@ -1,5 +1,6 @@
 import torch
 from tensordict import tensorclass
+from typing import Optional
 
 
 class ShiftAndScale:
@@ -83,17 +84,31 @@ class OmniFoldParticleTransform:
     shift_z: torch.Tensor
     scale_x: torch.Tensor
     scale_z: torch.Tensor
+    shift_cond_x: Optional[torch.Tensor] = None
+    shift_cond_z: Optional[torch.Tensor] = None
+    scale_cond_x: Optional[torch.Tensor] = None
+    scale_cond_z: Optional[torch.Tensor] = None
     eps: float = 1e-8
 
     def forward(self, batch):
 
         # process reco level
-        batch.x[..., 0] = batch.x[..., 0].add(self.eps).log()
-        batch.x = ShiftAndScale.forward(batch.x, shift=self.shift_x, scale=self.scale_x)
+        # fmt: off
+        batch.x[..., 0] = batch.x[..., 0].multiply(100).add(self.eps).log()  # log-scale pT
+        batch.z[..., 0] = batch.z[..., 0].multiply(100).add(self.eps).log()
 
-        # process part level
-        batch.z[..., 0] = batch.z[..., 0].add(self.eps).log()
+        if batch.cond_x is not None:  # jet kinematics
+            
+            batch.x[..., 0] -= batch.cond_x[:, [0]].log()  # use relative pT
+            batch.z[..., 0] -= batch.cond_z[:, [0]].log()           
+            batch.cond_x[..., [0, 3]] = batch.cond_x[..., [0, 3]].add(1e-3).log()  # log-scale pT, m
+            batch.cond_z[..., [0, 3]] = batch.cond_z[..., [0, 3]].add(1e-3).log()
+            batch.cond_x = ShiftAndScale.forward(batch.cond_x, shift=self.shift_cond_x, scale=self.scale_cond_x)
+            batch.cond_z = ShiftAndScale.forward(batch.cond_z, shift=self.shift_cond_z, scale=self.scale_cond_z)
+        
+        batch.x = ShiftAndScale.forward(batch.x, shift=self.shift_x, scale=self.scale_x)
         batch.z = ShiftAndScale.forward(batch.z, shift=self.shift_z, scale=self.scale_z)
+        # fmt: on
 
         return batch
 
@@ -140,6 +155,7 @@ class ttbarTransform:
         # batch.x[..., 15] -= 172.5
         # batch.x[..., [12, 13, 14, 15]] = batch.x[..., [12, 13, 14, 15]].arcsinh()
         batch.x = ShiftAndScale.forward(batch.x, shift=self.shift_x, scale=self.scale_x)
+        batch.x = torch.cat([batch.x, batch.conds.unsqueeze(1)], dim=1)
 
         # process part level
         Ms_z = [
@@ -155,6 +171,7 @@ class ttbarTransform:
         # batch.z[..., 15] -= 172.5
         # batch.z[..., [12, 13, 14, 15]] = batch.z[..., [12, 13, 14, 15]].arcsinh()
         batch.z = ShiftAndScale.forward(batch.z, shift=self.shift_z, scale=self.scale_z)
+        batch.z = torch.cat([batch.z, batch.conds.unsqueeze(1)], dim=1)
 
         return batch
 

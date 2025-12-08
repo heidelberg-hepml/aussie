@@ -13,6 +13,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from src.experiments.training import TrainingExperiment
 from src.utils import plotting
 
+
 class ClassificationExperiment(TrainingExperiment):
 
     @torch.inference_mode()
@@ -76,11 +77,16 @@ class ClassificationExperiment(TrainingExperiment):
         mask_dat = ~mask_sim
         lw_x_sim = record["lw_x"][..., mask_sim.numpy()].mean(0)
 
+        # read correction weights
+        correction_weights = test_set[:].sample_weights
+        if correction_weights is not None:
+            correction_weights = correction_weights[mask_dat].numpy()
+
         # observables
         self.log.info("Plotting reco observables")
         if dset.aux_x is None:
             x_dat = test_set[:].x[mask_dat]
-            x_sim = test_set[:].x[mask_sim]            
+            x_sim = test_set[:].x[mask_sim]
         else:
             x_dat = test_set[:].aux_x[mask_dat]
             x_sim = test_set[:].aux_x[mask_sim]
@@ -100,7 +106,7 @@ class ClassificationExperiment(TrainingExperiment):
                     logy=obs.logy,
                     qlims=obs.qlims,
                     xlims=obs.xlims,
-                    # exp_weights=exp_weights,
+                    exp_weights=correction_weights,
                 )
                 pdf.savefig(fig)
                 plt.close(fig)
@@ -109,7 +115,7 @@ class ClassificationExperiment(TrainingExperiment):
         self.log.info("Plotting part latents")
         if dset.aux_z is None:
             z_dat = test_set[:].z[mask_dat]
-            z_sim = test_set[:].z[mask_sim]            
+            z_sim = test_set[:].z[mask_sim]
         else:
             z_dat = test_set[:].aux_z[mask_dat]
             z_sim = test_set[:].aux_z[mask_sim]
@@ -129,7 +135,7 @@ class ClassificationExperiment(TrainingExperiment):
                     logy=obs.logy,
                     qlims=obs.qlims,
                     xlims=obs.xlims,
-                    # exp_weights=exp_weights,
+                    exp_weights=correction_weights,
                 )
                 pdf.savefig(fig)
                 plt.close(fig)
