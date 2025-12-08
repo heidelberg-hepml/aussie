@@ -1,0 +1,12 @@
+name: gaussian_toy
+dim: 1
+reader:
+  _target_: src.datasets.GaussianToyData.read
+  num: 25_000_000
+  smear_width: 3
+  mu_sim: 0.0
+  mu_dat: 0.2
+  sigma_sim: 1.0
+  sigma_dat: 0.9
+process:
+  _target_: src.datasets.GaussianToyProcess
