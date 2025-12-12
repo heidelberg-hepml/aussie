@@ -22,8 +22,10 @@ class ttbarData(UnfoldingData):
         path: str,
         # m_dat: Optional[Tuple[int]] = (1695,),
         # m_sim: Optional[Tuple[int]] = (1725,),
-        ms_dat: Optional[Tuple[int]] = (1715,),
-        ms_sim: Optional[Tuple[int]] = (1695, 1725, 1735),
+        # ms_dat: Optional[Tuple[int]] = (1715,),
+        # ms_sim: Optional[Tuple[int]] = (1695, 1725, 1735),
+        ms_dat: Optional[Tuple[int]] = (1725,),
+        ms_sim: Optional[Tuple[int]] = (1695, 1755),
         device: Optional[torch.device] = None,
     ):
 
@@ -35,20 +37,36 @@ class ttbarData(UnfoldingData):
         for i, ms in enumerate((ms_sim, ms_dat)):
             for k, prefix in zip(("x", "z"), ("rec", "gen")):
 
-                arr = np.concatenate(
-                    [
+                arrs, conds = [], []
+                for j, m in enumerate(ms):
+                    arrs.append(
                         np.load(os.path.join(path, f"{prefix}_{m}_delphes.npy"))
-                        for m in ms
-                    ]
-                )
-                arr = cartesian2jet(arr.reshape(-1, 3, 4))
+                    )
+                    # load conditions
+                    cond = (
+                        np.full_like(arrs[-1][:, 0], j, dtype=np.float32)
+                        if i == 0
+                        else np.random.choice(len(ms_sim), size=arrs[-1].shape[0])
+                    )
+                    conds.append(cond)
+                arr = np.concatenate(arrs)
+                cond = np.concatenate(conds)
 
+                # arr = np.concatenate(
+                #     [
+                #         np.load(os.path.join(path, f"{prefix}_{m}_delphes.npy"))
+                #         for m in ms
+                #     ]
+                # )
+                
+                arr = cartesian2jet(arr.reshape(-1, 3, 4))
                 tensor = torch.from_numpy(arr).float()
                 tensor_kwargs[k].append(tensor)
 
             size = len(tensor)
             batch_size += size
             tensor_kwargs["labels"].append(torch.full([size], i, dtype=torch.float32))
+            tensor_kwargs["conds"].append(torch.from_numpy(cond).float())
 
         for k in tensor_kwargs:
             tensor_kwargs[k] = torch.cat(tensor_kwargs[k])
@@ -75,7 +93,7 @@ class ttbarProcess:
             # shift_x=torch.tensor([2.9543e+00, 5.5877e+00, 0.0, 0.0, 2.5239e+00, 4.9391e+00, 0., 0., 2.1269e+00,  4.3051e+00, 0.0, 0.0, 2.6934e+00,  1.9430e+00,  1.1314e-01, -5.5757e-01]), # arcsinh
             # scale_x=torch.tensor([0.4388,  0.2597,  0.8748,  1.8155,  0.4442,  0.3447,  0.9006,  1.8154, 0.4913,  0.4273,  0.9358,  1.8150, 2.7796, 3.1538, 3.4341, 3.3587]),
             # shift_z=torch.tensor([2.9354e+00, 5.6162e+00, 0.0, 0.0, 2.5350e+00, 4.9778e+00, 0.0, 0.0, 2.1678e+00,  4.3499e+00, 0.0, 0.0, 2.9341e+00,  2.2679e+00,  5.1929e-01, 1.5454e-01]),
-            # scale_z=torch.tensor([0.4501,  0.2619,  0.8746,  1.8156,  0.4328,  0.3425,  0.8998,  1.8154, 0.4463,  0.4259,  0.9355,  1.8148, 2.5372, 2.9484, 3.3461, 3.0972]),            
+            # scale_z=torch.tensor([0.4501,  0.2619,  0.8746,  1.8156,  0.4328,  0.3425,  0.8998,  1.8154, 0.4463,  0.4259,  0.9355,  1.8148, 2.5372, 2.9484, 3.3461, 3.0972]),
             # fmt: on
         ),
     )
@@ -174,7 +192,8 @@ class ttbarProcess:
             name=r"M_123",
             compute=lambda p: compute_inv_mass(p, [0, 1, 2]),
             label=r"$M_{123}$",
-            xlims=(100, 250),
+            # xlims=(100, 250),
+            xlims=(135, 200),
         ),
     )
 

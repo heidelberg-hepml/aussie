@@ -64,7 +64,7 @@ class GaussianToyData(UnfoldingData):
 
 @dataclass
 class GaussianToyProcess:
-    num_features: int = 6
+    num_features: int = 1
     transforms: Tuple[Callable] = ()
     observables: Tuple[Observable] = (
         Observable(

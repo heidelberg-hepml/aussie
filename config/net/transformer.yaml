@@ -1,4 +1,4 @@
-_target_: src.networks.TransformerEncoder2
+_target_: src.networks.TransformerEncoder
 dim_in: ???
 dim_out: ???
 dim_cond: null
@@ -11,6 +11,7 @@ drop_attn: 0
 drop_proj: 0
 drop_mlp: 0
 bayesian: false
+use_jvp: false
 head:
   _target_: src.networks.MLP
   dim_in: ${net.hidden_channels}
@@ -22,6 +23,6 @@ head:
   drop: 0
   bayesian: false
   bayesian_prior_prec: 1.0
-  init_gain: 1.0 # only used if ensembling
-  out_bias_gain: 1.0 # only used if ensembling
+  # init_gain: 1.0 # only used if ensembling
+  # out_bias_gain: 1.0 # only used if ensembling
   ensembled: null

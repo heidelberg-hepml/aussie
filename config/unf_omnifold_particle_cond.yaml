@@ -1,6 +1,6 @@
 defaults:
   - /unf
-  - override net: transformer2
+  - override net: transformer
   - override dataset: omnifold_particle
   - _self_
 

@@ -4,8 +4,10 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
+from xformers.ops import memory_efficient_attention
 from jvp_flash_attention.jvp_attention import attention as jvp_attention
 from typing import Optional
+
 
 class FeedForward(nn.Module):
     def __init__(self, dim, mult=4, dropout=0.0):
@@ -24,7 +26,6 @@ class FeedForward(nn.Module):
         return x
 
 
-
 class Attention(nn.Module):
 
     def __init__(
@@ -37,6 +38,7 @@ class Attention(nn.Module):
         drop_attn: float = 0.0,
         drop_proj: float = 0.0,
         norm_layer: nn.Module = nn.LayerNorm,
+        use_jvp: bool = False,
     ) -> None:
         super().__init__()
         assert dim % num_heads == 0, "dim should be divisible by num_heads"
@@ -51,44 +53,63 @@ class Attention(nn.Module):
         self.drop_attn = nn.Dropout(drop_attn)
         self.proj = nn.Linear(dim, dim)
         self.drop_proj = nn.Dropout(drop_proj)
+        self.use_jvp = use_jvp
 
     def forward(
         self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
 
-        B, N, C = x.shape
-        qkv = (
-            self.qkv(x)
-            .reshape(B, N, 3, self.num_heads, self.head_dim)
-            .permute(2, 0, 3, 1, 4)
-        )
-        q, k, v = qkv.unbind(0)
-        q, k = self.q_norm(q), self.k_norm(k)
 
-        # dont attend to padded elements
-        attn_mask = None if mask is None else mask.view(B, 1, 1, N).expand(-1, self.num_heads, N, -1)
+        if self.use_jvp:
 
-        # with sdpa_kernel(SDPBackend.MATH): # for second derivatives
-        #     x = F.scaled_dot_product_attention(
-        #         q,
-        #         k,
-        #         v,
-        #         is_causal=self.is_causal,
-        #         attn_mask=attn_mask,
-        #         dropout_p=self.drop_attn.p if self.training else 0.0,
-        #     )
+            B, N, C = x.shape
+            qkv = (
+                self.qkv(x)
+                .reshape(B, N, 3, self.num_heads, self.head_dim)
+                .permute(2, 0, 3, 1, 4)
+            )
+            q, k, v = qkv.unbind(0)
+            q, k = self.q_norm(q), self.k_norm(k)
 
-        x = jvp_attention(
-            q,
-            k,
-            v,
-            attn_mask=attn_mask,
-            causal=self.is_causal,
-            dropout_p=self.drop_attn.p if self.training else 0.0,
-        )
+            # # dont attend to padded elements
+            attn_mask = None if mask is None else mask.view(B, 1, 1, N).expand(-1, self.num_heads, N, -1)
 
+            x = jvp_attention(
+                q,
+                k,
+                v,
+                attn_mask=attn_mask,
+                causal=self.is_causal,
+                dropout_p=self.drop_attn.p if self.training else 0.0,
+            )
+            x = x.transpose(1, 2).reshape(B, N, C)
+        else:
+            # x = F.scaled_dot_product_attention(
+            #     q,
+            #     k,
+            #     v,
+            #     is_causal=self.is_causal,
+            #     attn_mask=attn_mask,
+            #     dropout_p=self.drop_attn.p if self.training else 0.0,
+            # )
+            
+            B, N, C = x.shape
+            qkv = (
+                self.qkv(x)
+                .reshape(B, N, 3, self.num_heads, self.head_dim)
+                .permute(2, 0, 1, 3, 4)
+            )
+            q, k, v = qkv.unbind(0)
+            q, k = self.q_norm(q), self.k_norm(k)
 
-        x = x.transpose(1, 2).reshape(B, N, C)
+            x = memory_efficient_attention(
+                q,
+                k,
+                v,
+                attn_bias=mask,
+                p=self.drop_attn.p if self.training else 0.0,
+            ).flatten(2, 3)
+
         x = self.proj(x)
         x = self.drop_proj(x)
         return x
@@ -186,14 +207,12 @@ class StackedLinear(nn.Module):
         for i in range(self.channels):
 
             # # orig
-            # torch.nn.init.kaiming_uniform_(self.weight[i], a=math.sqrt(5))
+            torch.nn.init.kaiming_uniform_(self.weight[i], a=math.sqrt(5))
             fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight[i])
             bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
             torch.nn.init.uniform_(self.bias[i], -bound, bound)
-            
             # xavier
-            torch.nn.init.xavier_uniform_(self.weight[i], gain=self.gain)
-            
+            # torch.nn.init.xavier_uniform_(self.weight[i], gain=self.gain) # new
             # torch.nn.init.xavier_uniform_(self.bias[i], gain=self.gain, generator=None)
 
     def forward(self, input):

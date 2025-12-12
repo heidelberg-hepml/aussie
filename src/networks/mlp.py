@@ -20,7 +20,10 @@ class MLP(nn.Module):
         drop: float = 0.0,
         bayesian: bool = False,
         bayesian_prior_prec: float = 1.0,
+        init_gain: float = 1.0,
+        out_bias_gain: float = 1.0,
         ensembled: Optional[int] = None,
+        layernorms: bool = False,
     ):
 
         super().__init__()
@@ -32,11 +35,24 @@ class MLP(nn.Module):
         linear_layer = (
             partial(BayesianLinear, prior_prec=bayesian_prior_prec)
             if bayesian
-            else partial(StackedLinear, channels=ensembled) if ensembled else nn.Linear
+            else (
+                partial(StackedLinear, channels=ensembled, gain=init_gain)
+                if ensembled
+                else nn.Linear
+            )
         )
         self.linear_layers = nn.ModuleList(
             [linear_layer(a, b) for a, b in pairwise(units)]
         )
+
+        self.layernorms = layernorms
+        if layernorms:
+            self.norm_layers = nn.ModuleList(
+                [nn.LayerNorm(hidden_channels) for _ in range(num_hidden_layers)]
+            )
+
+        # if ensembled:
+        #     nn.init.uniform_(self.linear_layers[-1].bias, -out_bias_gain, out_bias_gain)
 
         self.act = getattr(F, act)
         self.out_act = getattr(F, out_act) if out_act else None
@@ -48,12 +64,14 @@ class MLP(nn.Module):
             # repeat input in ensemble dimension
             x = x.expand(self.ensembled, -1, -1)
 
-        for linear in self.linear_layers[:-1]:
+        for i, linear in enumerate(self.linear_layers[:-1]):
 
             x = linear(x)
             x = self.act(x)
             if self.drop is not None:
                 x = self.drop(x)
+            if self.layernorms:
+                x = self.norm_layers[i](x)
 
         x = self.linear_layers[-1](x)
         if self.out_act is not None:

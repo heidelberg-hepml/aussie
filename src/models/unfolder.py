@@ -29,6 +29,7 @@ class Unfolder(Model):
             self.cfg.cls_path, Classifier, freeze=False
         )
         self.params_cls = dict(self.classifier.named_parameters())
+        self.num_params_cls = sum(p.numel() for p in self.params_cls.values())
 
         # logging
         self.log_buffer = defaultdict(list)
@@ -67,9 +68,7 @@ class Unfolder(Model):
             self.classifier.eval()  # disable batchnorm, dropout etc.
 
             # forward pass classifier
-            lw_x = functional_call(self.classifier, self.params_cls, (batch,)).squeeze(
-                -1
-            )
+            lw_x = self.classifier(batch).squeeze(-1)
 
             # average over classifier ensemble
             if self.classifier.ensembled:
@@ -79,8 +78,6 @@ class Unfolder(Model):
             match self.cfg.loss:
 
                 case "mse":
-                    loss_reg = (lw_z - lw_x).pow(2)
-                case "mse2":
                     loss_reg = (lw_z.exp() - lw_x.exp()).pow(2)
                 case "bce":
                     loss_reg = (
@@ -90,7 +87,6 @@ class Unfolder(Model):
                     loss_reg = (-lw_z.exp() * lw_x - (1 - lw_x.exp())) / 2
 
             batch_dim = int(bool(self.ensembled))
-            # .multiply(batch.sample_weights) # not needed assuming only data gets corrected
             loss_reg = loss_reg.mean(batch_dim)
 
             # take gradients (in parallel if ensembled)
@@ -101,7 +97,7 @@ class Unfolder(Model):
             )
             grads_x = torch.autograd.grad(
                 loss_reg,
-                self.params_cls.values(),
+                self.classifier.trainable_parameters,
                 create_graph=True,
                 grad_outputs=grad_outputs,
                 is_grads_batched=self.ensembled,
@@ -109,11 +105,12 @@ class Unfolder(Model):
 
         # sum gradient norms
         match self.cfg.norm:
-
             case "l1":
-                loss_gradnorm = sum(g.abs().mean() for g in grads_x)
+                norm = lambda g: g.abs()
             case "l2":
-                loss_gradnorm = sum(g.pow(2).mean() for g in grads_x)
+                norm = lambda g: g.pow(2)
+
+        loss_gradnorm = sum(norm(g).sum() for g in grads_x) / self.num_params_cls
 
         self.log_scalar(loss_reg, "loss_reg")
         self.log_scalar(loss_gradnorm, "loss_gradnorm")
@@ -121,9 +118,8 @@ class Unfolder(Model):
         # scale result
         loss_gradnorm = loss_gradnorm * 1e3
         if self.ensembled:
-            loss_gradnorm = (
-                loss_gradnorm * self.ensembled
-            )  # such that lr scale is independent of ensemble size
+            # make lr scale independent of ensemble size
+            loss_gradnorm = loss_gradnorm * self.ensembled
 
         return loss_gradnorm
 
@@ -235,13 +231,17 @@ class RKHSUnfolder(Unfolder):
         if Y is None:
             Y = X
         # squared norms
-        X_sq = (X * X).sum(dim=1, keepdim=True)  # (N,1)
-        Y_sq = (Y * Y).sum(dim=1, keepdim=True)  # (M,1)
+        X_sq = (X * X).sum(dim=-1, keepdim=True)  # (N,1)
+        Y_sq = (Y * Y).sum(dim=-1, keepdim=True)  # (M,1)
         # pairwise squared distance: (N, M)
-        dist2 = X_sq - 2.0 * (X @ Y.t()) + Y_sq.t()
+        dist2 = X_sq - 2.0 * (X @ Y.transpose(-2, -1)) + Y_sq.transpose(-2, -1)
+
         # numerical stability: clamp small negatives to zero
         dist2 = torch.clamp(dist2, min=0.0)
-        K = torch.exp(-0.5 * dist2 / (lengthscale**2 + eps))
+        K = torch.exp(-0.5 * dist2 / (lengthscale**2 + eps))  # gaussian kernel
+        # C = 2 * X.size(-1) * lengthscale**2 # inverse multiquadratic kernel
+        # K = C / (dist2 + C)  # inverse multiquadratic kernel
+
         return K
 
     def batch_loss(self, batch: UnfoldingData):
@@ -256,28 +256,34 @@ class RKHSUnfolder(Unfolder):
         if self.classifier.ensembled:
             lw_x = lw_x.mean(0)
 
-        # print(f"{lw_x.shape=}")
-
         # forward pass unfolder
         lw_z = self.forward(batch)
-        # print(f"{lw_z.shape=}")
 
         # compute residuals
-        r = 1 - (lw_z - lw_x).clamp(-3, 3).exp()  # .unsqueeze(1)  # (N,1)
-        # r = lw_x.exp() - lw_z.exp()  # .unsqueeze(1)  # (N,1)
-        # r = r.clamp(max=100)
-
-        # print(f"{r.shape=}")
+        r = 1 - (lw_z - lw_x).exp()
 
         # compute kernel matrix K (N,N)
-        K = self.rbf_kernel_matrix(batch.x, None, lengthscale=self.cfg.scale)  # (N,N)
+        if self.lowlevel:
+            K = self.rbf_kernel_matrix(
+                batch.cond_x, None, lengthscale=self.cfg.scale
+            )  # (N,N)
+        else:
+            K = self.rbf_kernel_matrix(
+                batch.x, None, lengthscale=self.cfg.scale
+                None,
+                lengthscale=self.cfg.scale,
+            )  # (N,N)
         K.diagonal().zero_()
 
         # empirical RKHS quadratic loss: (1/N^2) r^T K r
         # r^T K r = sum_{i,j} r_i K_ij r_j
         # implement as (r.T @ K @ r) scalar
         B = len(batch)
-        loss_quad = (r.t() @ K @ r).squeeze() / (B * (B - 1))
+        # loss_quad = (r.transpose(-2, -1) @ K @ r).squeeze().abs().sqrt() / (B * (B - 1))
+        loss_quad = (r.transpose(-2, -1) @ K @ r).squeeze() / (B * (B - 1))
+
+        if self.net.ensembled:
+            loss_quad = loss_quad.sum(0)  # sum over ensemble members
 
         self.log_scalar(r.mean(), "r2_mean")
         self.log_scalar(K.sum() / (B * (B - 1)), "kernel_mean")

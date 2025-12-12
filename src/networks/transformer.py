@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 from torch.utils.checkpoint import checkpoint
 from typing import Optional
+from xformers.ops.fmha import BlockDiagonalMask
 
 from .layers import Attention, BayesianLinear, FeedForward
 
@@ -27,6 +28,7 @@ class TransformerEncoder(nn.Module):
         max_len: int = 100,
         pos_dim: int = 5,
         head: Optional[torch.nn.Module] = None,
+        use_jvp: bool = False,
     ):
 
         super().__init__()
@@ -37,6 +39,7 @@ class TransformerEncoder(nn.Module):
         # input/output embeddings
         self.proj_in = nn.Linear(dim_in, hidden_channels)
         self.head = head
+        self.use_jvp = use_jvp
 
         # init condition embedding if needed to bridge dimensions
         self.conditional = dim_cond is not None
@@ -54,6 +57,7 @@ class TransformerEncoder(nn.Module):
                     drop_mlp=drop_mlp,
                     drop_attn=drop_attn,
                     drop_proj=drop_proj,
+                    use_jvp=use_jvp,
                 )
                 for _ in range(num_blocks)
             ]
@@ -67,18 +71,7 @@ class TransformerEncoder(nn.Module):
         c: Optional[torch.Tensor] = None,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        # one_hot = torch.eye(self.max_len, device=x.device, dtype=x.dtype)[
-        #           None, : x.shape[1], :
-        #           ].expand(x.shape[0], -1, -1)
-        # x = torch.cat([x, one_hot], dim=-1)
-        # batch_size, seq_len, _ = x.size()
-        # pos_enc = self.positional_encoding(torch.arange(seq_len, device=x.device))
-        # pos_enc = pos_enc.unsqueeze(0)
-        # pos_enc = pos_enc.expand(batch_size, -1, -1)
-        # if pos_enc.size(-1) != x.size(-1):
-        #     pos_enc = pos_enc.unsqueeze(-1).expand(-1, -1, x.size(-1))
-        #
-        # x = x + pos_enc
+
         x = self.proj_in(x)
 
         if self.conditional:
@@ -91,13 +84,22 @@ class TransformerEncoder(nn.Module):
                 "Received condition in `TransformerEncoder.forward`, but `dim_cond` not provided at initialization"
             )
 
+        lengths = mask.int().sum(1)
+        if not self.use_jvp:
+            # create packed tensor
+            x = x[None, ..., mask, :]
+            mask = BlockDiagonalMask.from_seqlens(lengths.tolist(), device=x.device)
+
         # forward pass through transformer stack
         for block in self.blocks:
             x = block(x, mask=mask)
 
         # aggregate
-        x[~mask] = 0
-        x = x.sum(1)
+        if self.use_jvp:
+            x[~mask] = 0.0
+            x = x.sum(1) / lengths[..., None]
+        else:
+            x = torch.segment_reduce(x.squeeze(0), "mean", lengths=lengths)
 
         # norm and project output
         x = self.out_norm(x)
@@ -128,6 +130,7 @@ class TransformerBlock(nn.Module):
         drop_mlp: float = 0.0,
         drop_attn: float = 0.0,
         drop_proj: float = 0.0,
+        use_jvp: bool = False,
     ):
         super().__init__()
         self.norm1 = nn.LayerNorm(hidden_channels)
@@ -138,6 +141,7 @@ class TransformerBlock(nn.Module):
             is_causal=is_causal,
             drop_attn=drop_attn,
             drop_proj=drop_proj,
+            use_jvp=use_jvp,
         )
         self.norm2 = nn.LayerNorm(hidden_channels)
         self.ffwd = FeedForward(dim=hidden_channels, mult=mlp_ratio, dropout=drop_mlp)
