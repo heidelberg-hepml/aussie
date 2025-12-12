@@ -269,7 +269,7 @@ class RKHSUnfolder(Unfolder):
             )  # (N,N)
         else:
             K = self.rbf_kernel_matrix(
-                batch.x, None, lengthscale=self.cfg.scale
+                batch.x,
                 None,
                 lengthscale=self.cfg.scale,
             )  # (N,N)
