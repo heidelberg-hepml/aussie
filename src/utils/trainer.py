@@ -265,7 +265,9 @@ class Trainer:
         if "train_losses" in state_dicts:
             self.epoch_train_losses = state_dicts.get("train_losses", {})
         if "val_losses" in state_dicts:
-            self.epoch_train_losses = state_dicts.get("val_losses", {})
+            self.epoch_val_losses = state_dicts.get("val_losses", {})
+            if len(self.epoch_val_losses) > 0:
+                self.best_val_loss = self.epoch_val_losses.min()
         if "epoch" in state_dicts:
             self.start_epoch = state_dicts.get("epoch", 0) + 1
         if "opt" in state_dicts:

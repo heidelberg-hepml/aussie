@@ -68,7 +68,7 @@ class MLP(nn.Module):
 
             x = linear(x)
             x = self.act(x)
-            if self.drop is not None:
+            if self.drop is not None and i > 0:
                 x = self.drop(x)
             if self.layernorms:
                 x = self.norm_layers[i](x)

@@ -48,17 +48,6 @@ class OmniFoldParticleData(UnfoldingData):
                 mask = tensor[..., 0] > 0
                 tensor_kwargs[k].append(tensor)
 
-                # mask = tensor[..., 0] > 0
-                # tensor_kwargs[k].append(
-                #     torch.nested.narrow(
-                #         tensor,
-                #         dim=1,
-                #         start=0,
-                #         length=mask.int().sum(1),
-                #         layout=torch.jagged,
-                #     )
-                # )
-
                 tensor_kwargs[f"mask_{k}"].append(mask)
 
                 if use_cond:

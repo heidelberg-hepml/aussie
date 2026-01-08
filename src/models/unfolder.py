@@ -205,21 +205,6 @@ class OmniFolder(Model):
 
 class RKHSUnfolder(Unfolder):
 
-    def init__(self, cfg: DictConfig):
-        super().init(cfg)
-        self.kernel = torch.distributions.Normal(loc=0.0, scale=cfg.kernel_scale)
-
-    # def rbf_kernel_matrix(self, X, Y=None, lengthscale=1.0):
-    #     # X: (N, d), Y: (M, d) or None
-    #     if Y is None:
-    #         Y = X
-    #     X_sq = (X**2).sum(dim=1, keepdim=True)  # (N,1)
-    #     Y_sq = (Y**2).sum(dim=1, keepdim=True)  # (M,1)
-    #     # pairwise squared distances: (N, M)
-    #     dist2 = X_sq - 2.0 * X @ Y.t() + Y_sq.t()
-    #     K = torch.exp(-0.5 * dist2 / (lengthscale**2))
-    #     return K
-
     def rbf_kernel_matrix(self, X, Y=None, lengthscale=1.0, eps=1e-8):
         """
         Compute RBF (Gaussian) kernel matrix between X and Y:
@@ -250,17 +235,23 @@ class RKHSUnfolder(Unfolder):
         batch = batch[batch.labels == 0]
 
         # forward pass classifier
+        self.classifier.eval()
         with torch.no_grad():
             lw_x = self.classifier(batch)
-
-        if self.classifier.ensembled:
-            lw_x = lw_x.mean(0)
+            if self.classifier.ensembled:
+                lw_x = lw_x.mean(0)
 
         # forward pass unfolder
         lw_z = self.forward(batch)
 
-        # compute residuals
-        r = 1 - (lw_z - lw_x).exp()
+        # compute pointwise reg loss
+        match self.cfg.loss:
+            case "mse":
+                loss_reg = lw_z.exp() - lw_x.exp()
+            case "bce":
+                loss_reg = (1 - (lw_z - lw_x).exp()) / (1 + lw_x.exp())
+            case "mlc":
+                loss_reg = 1 - (lw_z - lw_x).exp()
 
         # compute kernel matrix K (N,N)
         if self.lowlevel:
@@ -280,12 +271,16 @@ class RKHSUnfolder(Unfolder):
         # implement as (r.T @ K @ r) scalar
         B = len(batch)
         # loss_quad = (r.transpose(-2, -1) @ K @ r).squeeze().abs().sqrt() / (B * (B - 1))
-        loss_quad = (r.transpose(-2, -1) @ K @ r).squeeze() / (B * (B - 1))
+        loss_quad = (loss_reg.transpose(-2, -1) @ K @ loss_reg).squeeze() / (
+            B * (B - 1)
+        )
+
+        loss_quad = loss_quad.clamp(min=0.0)
 
         if self.net.ensembled:
             loss_quad = loss_quad.sum(0)  # sum over ensemble members
 
-        self.log_scalar(r.mean(), "r2_mean")
+        self.log_scalar(loss_reg.mean(), "r2_mean")
         self.log_scalar(K.sum() / (B * (B - 1)), "kernel_mean")
 
         return loss_quad

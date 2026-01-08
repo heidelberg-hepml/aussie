@@ -99,7 +99,7 @@ class OmniFoldParticleTransform:
 
         if batch.cond_x is not None:  # jet kinematics
             
-            batch.x[..., 0] -= batch.cond_x[:, [0]].log()  # use relative pT
+            batch.x[..., 0] -= batch.cond_x[:, [0]].log()  # use relative pT for constituents
             batch.z[..., 0] -= batch.cond_z[:, [0]].log()           
             batch.cond_x[..., [0, 3]] = batch.cond_x[..., [0, 3]].add(1e-3).log()  # log-scale pT, m
             batch.cond_z[..., [0, 3]] = batch.cond_z[..., [0, 3]].add(1e-3).log()

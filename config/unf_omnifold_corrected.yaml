@@ -2,3 +2,9 @@ defaults:
   - /unf_omnifold
   - override dataset: omnifold_corrected
   - _self_
+
+training:
+  lr: 1e-4
+  optimizer:
+    warmup_steps: 5000
+    betas: [0.90,0.999]
