@@ -1,0 +1,21 @@
+# @package _global_
+defaults:
+  - /unf
+  - override /dataset: gaussian_toy
+  - _self_
+
+norm: l1
+
+net:
+  num_hidden_layers: 2
+  hidden_channels: 32
+  ensembled: 64
+
+training:
+  lr: 5e-03
+  epochs: 1
+  batch_size: 8192
+  optimizer:
+    warmup_steps: 200
+    weight_decay: 0.0
+

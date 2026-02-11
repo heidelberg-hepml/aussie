@@ -297,5 +297,5 @@ class Trainer:
                 return instantiate(
                     scfg,
                     optimizer=self.optimizer,
-                    total_iters=total_steps,
+                    # total_iters=total_steps,
                 )

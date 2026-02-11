@@ -1,4 +1,6 @@
 import torch
+import os
+import numpy as np
 from abc import abstractmethod
 from hydra.utils import call, instantiate
 from torch.utils.data import DataLoader, random_split
@@ -16,7 +18,7 @@ class TrainingExperiment(BaseExperiment):
         self.process = instantiate(self.cfg.dataset.process)
 
         if self.cfg.train or self.cfg.evaluate:
-            
+
             # model
             if not hasattr(self, "model"):
                 self.init_model()
@@ -24,7 +26,7 @@ class TrainingExperiment(BaseExperiment):
             # initialize train/val dataloaders
             self.log.info(f"Creating dataLoaders")
             self.dataloaders = dict(
-                zip(("train", "val", "test"), self.init_dataloader())
+                zip(("train", "val", "test"), self.init_dataloader(training=True))
             )
 
         if self.cfg.train:
@@ -45,11 +47,15 @@ class TrainingExperiment(BaseExperiment):
             )
             trainer.run_training()
 
-            del self.dataloaders["train"]
+            del self.dataloaders
             torch.cuda.empty_cache()
 
         # evaluate model
         if self.cfg.evaluate:
+
+            self.dataloaders = dict(
+                zip(("train", "val", "test"), self.init_dataloader())
+            )
 
             # load model state
             self.log.info(f"Loading model state from {self.exp_dir}.")
@@ -57,7 +63,13 @@ class TrainingExperiment(BaseExperiment):
             self.model.eval()
 
             self.log.info("Running evaluation on test dataset")
-            self.evaluate(self.dataloaders["test"])
+            for k, d in self.dataloaders.items():
+                predictions = self.evaluate(d)
+                # save to disk
+                savepath = os.path.join(self.exp_dir, f"predictions_{k}.npz")
+                self.log.info(f"Saving {k} predictions to {savepath}")
+                np.savez(savepath, **predictions)
+
             del self.dataloaders
             torch.cuda.empty_cache()
 
@@ -80,7 +92,7 @@ class TrainingExperiment(BaseExperiment):
         num_params = sum(w.numel() for w in self.model.trainable_parameters)
         self.log.info(f"Model ({model_name}) has {num_params} trainable parameters")
 
-    def init_dataloader(self):
+    def init_dataloader(self, training=False):
 
         dcfg = self.cfg.data
         tcfg = self.cfg.training
@@ -98,9 +110,37 @@ class TrainingExperiment(BaseExperiment):
         if on_gpu:
             dset = dset.to(self.device)
 
-        self.log.info(f"Read dataset:\n{dset}")
-        
+        # split dataset
         dsets = self.split_dataset(dset)
+
+        # load sim weights
+        if (p := self.cfg.prev_it_path) is not None:
+
+            # create unit weights if tensor is absent
+            if dset.sample_logweights is None:
+                dset.sample_logweights = torch.zeros(
+                    len(dset), dtype=torch.float, device=dset.device
+                )
+
+            for i, k in enumerate(("train", "val", "test")):
+
+                idcs = torch.as_tensor(dsets[i].indices, device=dset.device)
+
+                sim_logweights = torch.from_numpy(
+                    np.load(os.path.join(p, f"unf/predictions_{k}.npz"))[
+                        "lw_z_sim"
+                    ].mean(0)
+                ).to(dset.device)
+
+                if dset.labels is None:
+                    # all events are sim if labels absent
+                    dset.sample_logweights[idcs] = sim_logweights
+                else:
+                    # fill sim weights only
+                    mask = dset.labels[idcs] == 0
+                    dset.sample_logweights.index_put_((idcs[mask],), sim_logweights)
+
+        self.log.info(f"Read dataset:\n{dset}")
 
         # create dataloaders
         dataloaders = []
@@ -110,7 +150,7 @@ class TrainingExperiment(BaseExperiment):
         use_mp = self.cfg.train and num_workers > 0
         for i, d in enumerate(dsets):
 
-            is_train_split = i == 0
+            is_train_split = (i == 0) and training
             batch_size = tcfg.batch_size if is_train_split else tcfg.test_batch_size
 
             dataloaders.append(
@@ -139,7 +179,6 @@ class TrainingExperiment(BaseExperiment):
 
         # seed data split to avoid leakage across iterations
         fixed_rng = torch.Generator().manual_seed(1729)
-
         splits = random_split(
             dset,
             [1 - dcfg.val_frac - dcfg.test_frac, dcfg.val_frac, dcfg.test_frac],

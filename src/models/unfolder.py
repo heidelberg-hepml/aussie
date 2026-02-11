@@ -72,7 +72,13 @@ class Unfolder(Model):
 
             # average over classifier ensemble
             if self.classifier.ensembled:
-                lw_x = lw_x.mean(0)
+
+                if self.cfg.joint_ensembling:
+                    # combine classifier and unfolder ensemble members elementwise
+                    assert self.ensembled == self.classifier.ensembled
+                else:
+                    # average over classifier ensemble
+                    lw_x = lw_x.mean(0)
 
             # calculate regression loss
             match self.cfg.loss:
@@ -86,6 +92,11 @@ class Unfolder(Model):
                 case "mlc":
                     loss_reg = (-lw_z.exp() * lw_x - (1 - lw_x.exp())) / 2
 
+            # sample weights
+            if batch.sample_logweights is not None:
+                loss_reg = loss_reg * batch.sample_logweights.exp()
+
+            # average
             batch_dim = int(bool(self.ensembled))
             loss_reg = loss_reg.mean(batch_dim)
 
@@ -177,7 +188,13 @@ class OmniFolder(Model):
 
         # average over classifier ensemble
         if self.classifier.ensembled:
-            lw_x = lw_x.mean(0)
+
+            if self.cfg.joint_ensembling:
+                # combine classifier and unfolder ensemble members elementwise
+                assert self.ensembled == self.classifier.ensembled
+            else:
+                # average over classifier ensemble
+                lw_x = lw_x.mean(0)
 
         # calculate regression loss
         batch_dim = (0, 1) if self.ensembled else 0
@@ -239,7 +256,13 @@ class RKHSUnfolder(Unfolder):
         with torch.no_grad():
             lw_x = self.classifier(batch)
             if self.classifier.ensembled:
-                lw_x = lw_x.mean(0)
+
+                if self.cfg.joint_ensembling:
+                    # combine classifier and unfolder ensemble members elementwise
+                    assert self.ensembled == self.classifier.ensembled
+                else:
+                    # average over classifier ensemble
+                    lw_x = lw_x.mean(0)
 
         # forward pass unfolder
         lw_z = self.forward(batch)
@@ -252,6 +275,10 @@ class RKHSUnfolder(Unfolder):
                 loss_reg = (1 - (lw_z - lw_x).exp()) / (1 + lw_x.exp())
             case "mlc":
                 loss_reg = 1 - (lw_z - lw_x).exp()
+
+        # sample weights
+        if batch.sample_logweights is not None:
+            loss_reg = loss_reg * batch.sample_logweights.exp().unsqueeze(-1)
 
         # compute kernel matrix K (N,N)
         if self.lowlevel:

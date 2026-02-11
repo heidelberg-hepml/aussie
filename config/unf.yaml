@@ -7,10 +7,12 @@ run_name: unfold_${dataset.name}
 experiment: UnfoldingExperiment
 
 cls_path: ???
+prev_it_path: null
 
 loss: mlc
-norm: l2
+norm: l1
 bayesian: false
+joint_ensembling: false
 
 model:
   _target_: src.models.Unfolder

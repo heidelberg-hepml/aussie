@@ -50,11 +50,7 @@ class ClassificationExperiment(TrainingExperiment):
             else torch.stack(predictions["lw_x"]).numpy()
         )
 
-        # save to disk
-        tag = "" if tag is None else f"_{tag}"
-        savepath = os.path.join(self.exp_dir, f"predictions{tag}.npz")
-        self.log.info(f"Saving {tag} labels, weights and probs to {savepath}")
-        np.savez(savepath, **predictions)
+        return predictions
 
     def plot(self):
 
@@ -71,16 +67,26 @@ class ClassificationExperiment(TrainingExperiment):
 
         # read predicted weights
         self.log.info("Reading predictions from disk")
-        record = np.load(os.path.join(self.exp_dir, "predictions.npz"))
+        record = np.load(os.path.join(self.exp_dir, "predictions_test.npz"))
 
         mask_sim = test_set[:].labels == 0
         mask_dat = ~mask_sim
-        lw_x_sim = record["lw_x"][..., mask_sim.numpy()].mean(0)
+        lw_x_sim = record["lw_x"][..., mask_sim.numpy()].mean(0) # TODO: remove mean for ensemble uncertainties
 
-        # read correction weights
-        correction_weights = test_set[:].sample_weights
-        if correction_weights is not None:
-            correction_weights = correction_weights[mask_dat].numpy()
+        # load sample weights from iteration or data correction
+        if (p := self.cfg.prev_it_path) is not None:
+
+            lw_sample_sim = torch.from_numpy(
+                np.load(os.path.join(p, f"unf/predictions_test.npz"))["lw_z_sim"].mean(
+                    0
+                )
+            )
+            lw_x_sim += lw_sample_sim.numpy()
+
+        if (lw_sample_exp := test_set[:].sample_logweights) is not None:  # exp weights
+            exp_weights = lw_sample_exp[mask_dat].exp().numpy()
+        else:
+            exp_weights = None
 
         # observables
         self.log.info("Plotting reco observables")
@@ -91,7 +97,7 @@ class ClassificationExperiment(TrainingExperiment):
             x_dat = test_set[:].aux_x[mask_dat]
             x_sim = test_set[:].aux_x[mask_sim]
         with PdfPages(os.path.join(savedir, f"observables.pdf")) as pdf:
-            for obs in self.process.observables:
+            for obs in self.process.observables_x:
                 fig, ax = plotting.plot_reweighting(
                     exp=obs.compute(x_dat).numpy(),
                     sim=obs.compute(x_sim).numpy(),
@@ -106,7 +112,7 @@ class ClassificationExperiment(TrainingExperiment):
                     logy=obs.logy,
                     qlims=obs.qlims,
                     xlims=obs.xlims,
-                    exp_weights=correction_weights,
+                    exp_weights=exp_weights,
                 )
                 pdf.savefig(fig)
                 plt.close(fig)
@@ -120,7 +126,7 @@ class ClassificationExperiment(TrainingExperiment):
             z_dat = test_set[:].aux_z[mask_dat]
             z_sim = test_set[:].aux_z[mask_sim]
         with PdfPages(os.path.join(savedir, f"latents.pdf")) as pdf:
-            for obs in self.process.observables:
+            for obs in self.process.observables_z:
                 fig, ax = plotting.plot_reweighting(
                     exp=obs.compute(z_dat).numpy(),
                     sim=obs.compute(z_sim).numpy(),
@@ -135,7 +141,7 @@ class ClassificationExperiment(TrainingExperiment):
                     logy=obs.logy,
                     qlims=obs.qlims,
                     xlims=obs.xlims,
-                    exp_weights=correction_weights,
+                    exp_weights=exp_weights,
                 )
                 pdf.savefig(fig)
                 plt.close(fig)

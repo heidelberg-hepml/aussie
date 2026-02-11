@@ -29,17 +29,22 @@ class TransformerEncoder(nn.Module):
         pos_dim: int = 5,
         head: Optional[torch.nn.Module] = None,
         use_jvp: bool = False,
+        encode_pos: bool = False,
     ):
 
         super().__init__()
         self.dim_in = dim_in
         self.bayesian = bayesian
-        self.ensembled = False  # TODO: Implement parallel ensembling
+
         self.max_len = max_len
         # input/output embeddings
         self.proj_in = nn.Linear(dim_in, hidden_channels)
         self.head = head
         self.use_jvp = use_jvp
+        self.encode_pos = encode_pos
+
+        # self.ensembled = False  # TODO: Implement parallel ensembling
+        self.ensembled = self.head.ensembled
 
         # init condition embedding if needed to bridge dimensions
         self.conditional = dim_cond is not None
@@ -63,7 +68,8 @@ class TransformerEncoder(nn.Module):
             ]
         )
         self.out_norm = nn.LayerNorm(hidden_channels)
-        # self.positional_encoding = nn.Embedding(max_len, pos_dim)
+        if self.encode_pos:
+            self.pos_encoding = nn.Embedding(max_len, hidden_channels)
 
     def forward(
         self,
@@ -72,7 +78,12 @@ class TransformerEncoder(nn.Module):
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
 
+        if mask is None:
+            mask = torch.ones_like(x[..., 0], dtype=torch.bool)
+
         x = self.proj_in(x)
+        if self.encode_pos:
+            x = x + self.pos_encoding.weight[None, : x.size(1), :]
 
         if self.conditional:
             # append condition as token
@@ -133,6 +144,7 @@ class TransformerBlock(nn.Module):
         use_jvp: bool = False,
     ):
         super().__init__()
+        self.hidden_channels = hidden_channels
         self.norm1 = nn.LayerNorm(hidden_channels)
         self.attn = Attention(
             hidden_channels,

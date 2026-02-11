@@ -35,7 +35,12 @@ class UnfoldingExperiment(TrainingExperiment):
             for batch in dataloader:
 
                 batch_sim = batch[batch.labels == 0].to(self.device, non_blocking=True)
-                lw_z_sim.append(self.model(batch_sim).squeeze(-1))
+                lw_sample = (
+                    0.0
+                    if batch_sim.sample_logweights is None
+                    else batch_sim.sample_logweights
+                )
+                lw_z_sim.append(self.model(batch_sim).squeeze(-1) + lw_sample)
 
             predictions["lw_z_sim"].append(
                 torch.cat(lw_z_sim, dim=1 if self.model.ensembled else 0).cpu()
@@ -48,11 +53,7 @@ class UnfoldingExperiment(TrainingExperiment):
             else torch.stack(predictions["lw_z_sim"]).numpy()
         )
 
-        # save to disk
-        tag = "" if tag is None else f"_{tag}"
-        savepath = os.path.join(self.exp_dir, f"predictions{tag}.npz")
-        self.log.info(f"Saving {tag} labels, weights and probs to {savepath}")
-        np.savez(savepath, **predictions)
+        return predictions
 
     def plot(self):
 
@@ -69,22 +70,30 @@ class UnfoldingExperiment(TrainingExperiment):
 
         self.log.info("Reading predictions from disk")
         # unfolding weights
-        record = np.load(os.path.join(self.exp_dir, "predictions.npz"))
+        record = np.load(os.path.join(self.exp_dir, "predictions_test.npz"))
         # classifier weights
-        record_cls = np.load(os.path.join(self.cfg.cls_path, "predictions.npz"))
+        record_cls = np.load(os.path.join(self.cfg.cls_path, "predictions_test.npz"))
 
         # select simulation only
         mask_sim = test_set[:].labels == 0
         mask_dat = ~mask_sim
-        lw_z_sim = record["lw_z_sim"]  # .mean(0)
+        lw_z_sim = record["lw_z_sim"]
         lw_x_sim = record_cls["lw_x"][..., mask_sim.numpy()]
 
-        # # read correction weights
-        # correction_weights = test_set[:].sample_weights[mask_dat].numpy()
-        # read correction weights
-        correction_weights = test_set[:].sample_weights
-        if correction_weights is not None:
-            correction_weights = correction_weights[mask_dat].numpy()
+        # load sample weights from iteration or data correction
+        if (p := self.cfg.prev_it_path) is not None:
+
+            lw_sample_sim = torch.from_numpy(
+                np.load(os.path.join(p, f"unf/predictions_test.npz"))["lw_z_sim"].mean(
+                    0
+                )
+            )
+            lw_x_sim += lw_sample_sim.numpy()
+
+        if (lw_sample_exp := test_set[:].sample_logweights) is not None:  # exp weights
+            exp_weights = lw_sample_exp[mask_dat].exp().numpy()
+        else:
+            exp_weights = None
 
         # observables
         self.log.info("Plotting reco observables")
@@ -94,15 +103,17 @@ class UnfoldingExperiment(TrainingExperiment):
         else:
             x_dat = test_set[:].aux_x[mask_dat]
             x_sim = test_set[:].aux_x[mask_sim]
+
         with PdfPages(os.path.join(savedir, f"observables.pdf")) as pdf:
-            for obs in self.process.observables:
+            for obs in self.process.observables_x:
+
                 fig, ax = plotting.plot_reweighting(
-                    # fig, ax = plotting.plot_reweighting_ensemble(
+                # fig, ax = plotting.plot_reweighting_ensemble(
                     exp=obs.compute(x_dat).numpy(),
                     sim=obs.compute(x_sim).numpy(),
                     weights_list=[np.exp(lw_z_sim), np.exp(lw_x_sim)],
                     variance_list=[None, None],
-                    names_list=["Unfolder", "Classifier"],
+                    names_list=["AUSSIE", "Classifier"],
                     # xlabel=pcfg.obs_labels[i],
                     xlabel=obs.label,
                     figsize=np.array([1, 5 / 6]) * pw / 2,
@@ -111,7 +122,7 @@ class UnfoldingExperiment(TrainingExperiment):
                     logy=obs.logy,
                     qlims=obs.qlims,
                     xlims=obs.xlims,
-                    exp_weights=correction_weights,
+                    exp_weights=exp_weights,
                 )
                 pdf.savefig(fig)
                 plt.close(fig)
@@ -125,14 +136,14 @@ class UnfoldingExperiment(TrainingExperiment):
             z_dat = test_set[:].aux_z[mask_dat]
             z_sim = test_set[:].aux_z[mask_sim]
         with PdfPages(os.path.join(savedir, f"latents.pdf")) as pdf:
-            for obs in self.process.observables:
+            for obs in self.process.observables_z:
                 fig, ax = plotting.plot_reweighting(
-                    # fig, ax = plotting.plot_reweighting_ensemble(
+                # fig, ax = plotting.plot_reweighting_ensemble(
                     exp=obs.compute(z_dat).numpy(),
                     sim=obs.compute(z_sim).numpy(),
                     weights_list=[np.exp(lw_z_sim), np.exp(lw_x_sim)],
                     variance_list=[None, None],
-                    names_list=["AUSSIE", "OmniFold"],
+                    names_list=["AUSSIE", "Classifier"],
                     # xlabel=pcfg.obs_labels[i],
                     xlabel=obs.label,
                     figsize=np.array([1, 5 / 6]) * pw / 2,
@@ -141,7 +152,7 @@ class UnfoldingExperiment(TrainingExperiment):
                     logy=obs.logy,
                     qlims=obs.qlims,
                     xlims=obs.xlims,
-                    exp_weights=correction_weights,
+                    exp_weights=exp_weights,
                 )
                 pdf.savefig(fig)
                 plt.close(fig)

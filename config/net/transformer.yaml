@@ -2,10 +2,10 @@ _target_: src.networks.TransformerEncoder
 dim_in: ???
 dim_out: ???
 dim_cond: null
-hidden_channels: 64
+hidden_channels: 48
 num_blocks: 2
-num_heads: 2
-mlp_ratio: 2
+num_heads: 4
+mlp_ratio: 4
 checkpoint_grads: false
 drop_attn: 0
 drop_proj: 0
@@ -26,3 +26,4 @@ head:
   # init_gain: 1.0 # only used if ensembling
   # out_bias_gain: 1.0 # only used if ensembling
   ensembled: null
+  layernorms: false

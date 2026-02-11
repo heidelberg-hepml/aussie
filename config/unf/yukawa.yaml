@@ -1,0 +1,29 @@
+# @package _global_
+defaults:
+  - /unf
+  - override /net: transformer
+  - override /dataset: yukawa
+  - _self_
+
+norm: l1
+
+data:
+  on_gpu: true
+  
+dataset:
+  reader:
+    path: '/remote/gpu07/huetsch/memennto/data'
+    num: null
+  process:
+    _target_: src.datasets.YukawaProcess
+
+net:
+  dim_in: 3
+  encode_pos: true
+  
+training:
+  lr: 0.001
+  batch_size: 2048
+  optimizer:
+    warmup_steps: 5000
+    weight_decay: 0.0

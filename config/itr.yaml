@@ -1,0 +1,12 @@
+run_name: iterate_${dataset.name}
+experiment: IterationExperiment
+
+iterations: 5
+cls_path: null
+prev_it_path: null
+warm_start_unf: false
+cls_lr_decay: null
+unf_lr_decay: null
+
+defaults:
+  - default

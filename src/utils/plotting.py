@@ -46,12 +46,14 @@ def plot_reweighting(
     quantiles_from_sim=False,
     name_exp="Data",
     name_sim="Sim",
+    show_sim=True,
     denom_idx=0,
     ratio_lims=(0.85, 1.15),
     density=True,
     add_chi2=True,
     add_legend=True,
     exp_weights=None,
+    colors=None,
 ):
 
     # make figure with ratio axis
@@ -62,13 +64,14 @@ def plot_reweighting(
 
     ratio_ax.axhline(1.0, color="gray", lw=1.0)
 
-    # # remove entries with nans
-    # exp = exp[np.isfinite(exp)]
-    # sim_mask = np.isfinite(sim)
-    # for ws in weights_list:
-    #     sim_mask = sim_mask & np.isfinite(ws)
-    # sim = sim[sim_mask]
-    # weights_list = [ws[sim_mask] for ws in weights_list]
+    # remove entries with nans
+    exp_mask = np.isfinite(exp)
+    sim_mask = np.isfinite(sim)
+    if exp_weights is not None:
+        exp_weights = exp_weights[exp_mask]
+    exp = exp[exp_mask]
+    sim = sim[sim_mask]
+    weights_list = [ws[..., sim_mask] for ws in weights_list]
 
     # lo, hi = np.quantile(sim if quantiles_from_sim else exp, qlims)
     lo, hi = xlims or np.quantile(np.hstack([sim, exp]), qlims)
@@ -119,7 +122,7 @@ def plot_reweighting(
 
     # colors = (BLACK, "C0", "C2", "C3", "C4", 'C5')
     # colors = [BLACK, "#1D6A9E", "#ea6702", "#009826"] + [f"C{i}" for i in range(3,8)]
-    colors = [
+    colors = colors or [
         BLACK,
         "#1D6A9E",
         "#7E3B91",
@@ -133,6 +136,8 @@ def plot_reweighting(
     legend_objs, legend_labels = [], []
     for i, (y, err, label, color) in enumerate(zip(ys, errs, labels, colors)):
 
+        if (i==1) and not show_sim: continue
+        
         if add_chi2 and (label in labels_rew):
             if density:
                 pull = (y / y.sum() - y_exp / y_exp.sum()) / np.sqrt(
@@ -196,7 +201,93 @@ def plot_reweighting(
         # )
 
         # legend_objs.append((line_obj, fill_obj))
-        
+
+        # if i > 0:
+        #     (line_obj,) = main_ax.step(
+        #         bins,
+        #         dup_last(y) * scale,
+        #         where="post",
+        #         color=color,
+        #         label=label,
+        #         lw=1.0,
+        #         zorder=i,
+        #     )
+        #     fill_obj = main_ax.fill_between(
+        #         bins,
+        #         dup_last(y - err) * scale,
+        #         dup_last(y + err) * scale,
+        #         alpha=0.2,
+        #         step="post",
+        #         facecolor=color,
+        #         zorder=i,
+        #     )
+        #     ratio_scale = denom.sum() / y.sum() if density else 1
+        #     ratio_ax.step(
+        #         bins,
+        #         dup_last(y / denom) * ratio_scale,
+        #         where="post",
+        #         color=color,
+        #         zorder=i,
+        #         lw=1.0,
+        #     )
+        #     ratio_ax.fill_between(
+        #         bins,
+        #         dup_last((y - err) / denom) * ratio_scale,
+        #         dup_last((y + err) / denom) * ratio_scale,
+        #         alpha=0.2,
+        #         step="post",
+        #         facecolor=color,
+        #         zorder=i,
+        #     )
+
+        #     legend_objs.append((line_obj, fill_obj))
+
+        # else:
+        #     bin_centers = 0.5 * (bins[1:] + bins[:-1])
+        #     point_obj = main_ax.errorbar(
+        #         bin_centers,
+        #         y * scale,
+        #         yerr=err * scale,
+        #         color=color,
+        #         label=label,
+        #         fmt="o",
+        #         zorder=len(ys) + 1,
+        #         ms=1.5,
+        #         elinewidth=1,
+        #     )
+        #     ratio_scale = denom.sum() / y.sum() if density else 1
+        #     ratio_ax.errorbar(
+        #         bin_centers,
+        #         y / denom * ratio_scale,
+        #         yerr=err / denom * ratio_scale,
+        #         color=color,
+        #         fmt="o",
+        #         zorder=len(ys) + 1,
+        #         ms=1.5,
+        #         elinewidth=1,
+        #     )
+
+        #     legend_objs.append(point_obj)
+
+        fill_obj = main_ax.fill_between(
+            bins,
+            dup_last(y - err) * scale,
+            dup_last(y + err) * scale,
+            alpha=0.15,
+            step="post",
+            facecolor=color,
+            zorder=i,
+        )
+        ratio_scale = denom.sum() / y.sum() if density else 1
+        ratio_ax.fill_between(
+            bins,
+            dup_last((y - err) / denom) * ratio_scale,
+            dup_last((y + err) / denom) * ratio_scale,
+            alpha=0.15,
+            step="post",
+            facecolor=color,
+            zorder=i,
+        )
         if i > 0:
             (line_obj,) = main_ax.step(
                 bins,
@@ -204,63 +295,43 @@ def plot_reweighting(
                 where="post",
                 color=color,
                 label=label,
-                lw=1.0,
+                lw=0.75,
                 zorder=i,
             )
-            fill_obj = main_ax.fill_between(
-                bins,
-                dup_last(y - err) * scale,
-                dup_last(y + err) * scale,
-                alpha=0.2,
-                step="post",
-                facecolor=color,
-                zorder=i,
-            )
-            ratio_scale = denom.sum() / y.sum() if density else 1
             ratio_ax.step(
                 bins,
                 dup_last(y / denom) * ratio_scale,
                 where="post",
                 color=color,
                 zorder=i,
-                lw=1.0,
-            )
-            ratio_ax.fill_between(
-                bins,
-                dup_last((y - err) / denom) * ratio_scale,
-                dup_last((y + err) / denom) * ratio_scale,
-                alpha=0.2,
-                step="post",
-                facecolor=color,
-                zorder=i,
+                lw=0.75,
             )
 
             legend_objs.append((line_obj, fill_obj))
 
         else:
             bin_centers = 0.5 * (bins[1:] + bins[:-1])
-            point_obj = main_ax.errorbar(
+            point_obj = main_ax.scatter(
                 bin_centers,
                 y * scale,
-                yerr=err * scale,
+                # yerr=err * scale,
                 color=color,
                 label=label,
-                fmt='o',
-                zorder=len(ys)+1,
-                ms=1.5,
-                elinewidth=1,
+                # fmt="o",
+                zorder=len(ys) + 1,
+                s=1.5,
+                # elinewidth=1,
             )
-            ratio_scale = denom.sum() / y.sum() if density else 1
-            ratio_ax.errorbar(
+            ratio_ax.scatter(
                 bin_centers,
                 y / denom * ratio_scale,
-                yerr=err / denom * ratio_scale,
+                # yerr=err / denom * ratio_scale,
                 color=color,
-                fmt='o',
-                zorder=len(ys)+1,
-                ms=1.5,
-                elinewidth=1,
-            )            
+                # fmt="o",
+                zorder=len(ys) + 1,
+                s=1.5,
+                # elinewidth=1,
+            )
 
             legend_objs.append(point_obj)        
 
@@ -327,12 +398,14 @@ def plot_reweighting_ensemble(
     quantiles_from_sim=False,
     name_exp="Data",
     name_sim="Sim",
+    show_sim=True,
     denom_idx=0,
     ratio_lims=(0.85, 1.15),
     density=True,
     add_chi2=True,
     exp_weights=None,
     add_legend=False,
+    colors=None,
 ):
 
     # make figure with ratio axis
@@ -341,13 +414,16 @@ def plot_reweighting_ensemble(
     main_ax = plt.subplot(grid[0])
     ratio_ax = plt.subplot(grid[1])
 
+    ratio_ax.axhline(1.0, color="gray", lw=1.0)
+
     # # remove entries with nans
-    # exp = exp[np.isfinite(exp)]
+    # exp_mask = np.isfinite(exp)
     # sim_mask = np.isfinite(sim)
-    # for ws in weights_list:
-    #     sim_mask = sim_mask & np.isfinite(ws)
+    # if exp_weights is not None:
+    #     exp_weights = exp_weights[exp_mask]
+    # exp = exp[exp_mask]
     # sim = sim[sim_mask]
-    # weights_list = [ws[sim_mask] for ws in weights_list]
+    # weights_list = [ws[..., sim_mask] for ws in weights_list]
 
     # lo, hi = np.quantile(sim if quantiles_from_sim else exp, qlims)
     lo, hi = xlims or np.quantile(np.hstack([sim, exp]), qlims)
@@ -360,20 +436,24 @@ def plot_reweighting_ensemble(
     # counts and errors
     if exp_weights is None:
         exp_weights = np.ones_like(exp)
-        
+
     y_exp = np.histogram(exp, bins=bins, weights=exp_weights)[0]
     sum_w2s = binned_statistic(exp, exp_weights**2, "sum", bins=bins)[0]
     if density:
         norm_exp = y_exp.sum()
         y_exp = y_exp / norm_exp
         sum_w2s = sum_w2s / (norm_exp**2)
-    err_exp = (y_exp - np.sqrt(sum_w2s), y_exp + np.sqrt(sum_w2s))
-    
+    err_exp = (y_exp - np.sqrt(sum_w2s), y_exp + np.sqrt(sum_w2s)) # only if not using plt.errorbar for data
+    # err_exp = np.sqrt(sum_w2s)
+
     y_sim = np.histogram(sim, bins=bins)[0]
     err_sim = (y_sim - np.sqrt(y_sim), y_sim + np.sqrt(y_sim))
     if density:
         norm_sim = y_sim.sum()
-        err_sim = ((y_sim - np.sqrt(y_sim))/norm_sim, (y_sim + np.sqrt(y_sim))/norm_sim)
+        err_sim = (
+            (y_sim - np.sqrt(y_sim)) / norm_sim,
+            (y_sim + np.sqrt(y_sim)) / norm_sim,
+        )
         y_sim = y_sim / norm_sim
 
     # weighted counts and errors
@@ -389,7 +469,7 @@ def plot_reweighting_ensemble(
         )
         if density:
             all_y = all_y / norm_sim
-            all_sum_w2s = all_sum_w2s / (norm_sim ** 2)        
+            all_sum_w2s = all_sum_w2s / (norm_sim**2)
 
         y_rew = np.quantile(all_y, 0.5, axis=0)
         err = (
@@ -408,7 +488,7 @@ def plot_reweighting_ensemble(
 
     # colors = (BLACK, "C0", "C2", "C3", "C4", 'C5')
     # colors = [BLACK, "#1D6A9E", "#ea6702", "#009826"] + [f"C{i}" for i in range(3,8)]
-    colors = [
+    colors = colors or [
         BLACK,
         "#1D6A9E",
         "#7E3B91",
@@ -422,17 +502,7 @@ def plot_reweighting_ensemble(
     legend_objs, legend_labels = [], []
     for i, (y, err, label, color) in enumerate(zip(ys, errs, labels, colors)):
 
-        # if add_chi2 and (label in labels_rew):
-        #     if density:
-        #         pull = (y / y.sum() - y_exp / y_exp.sum()) / np.sqrt(
-        #             (err / y.sum()) ** 2 + (err_exp / y_exp.sum()) ** 2
-        #         )
-        #     else:
-        #         pull = (y - y_exp) / np.sqrt(err**2 + err_exp**2)
-
-        #     nonempty = (y != 0) & (y_exp != 0)  # exclude empty bins
-        #     chi2 = (pull[nonempty] ** 2).sum() / num_bins
-        #     label += f" ({chi2:.2f})"
+        if (i==1) and not show_sim: continue
 
         legend_labels.append(label)
 
@@ -443,49 +513,96 @@ def plot_reweighting_ensemble(
             # else 1 / y_sim.sum() if (label in labels_rew) else 1 / y.sum()
         )
 
-        # (line_obj,) = main_ax.step(
-        #     bins,
-        #     dup_last(y) * scale,
-        #     where="post",
-        #     color=color,
-        #     label=label,
-        #     lw=1.0,
-        # )
-        # fill_obj = main_ax.fill_between(
-        #     bins,
-        #     dup_last(err[0]) * scale,
-        #     dup_last(err[1]) * scale,
-        #     alpha=0.2,
-        #     step="post",
-        #     facecolor=color,
-        # )
-        # ratio_scale = (
-        #     1
-        #     # if (not density) or (label in labels_rew)
-        #     # else denom.sum() / y.sum()
-        #     # else (
-        #     #     denom.sum() / y_sim.sum()
-        #     #     if (label in labels_rew)
-        #     #     else denom.sum() / y.sum()
-        #     # )
-        # )
-        # ratio_ax.step(
-        #     bins,
-        #     dup_last(y / denom) * ratio_scale,
-        #     where="post",
-        #     color=color,
-        #     lw=1.0,
-        # )
-        # ratio_ax.fill_between(
-        #     bins,
-        #     dup_last(err[0] / denom) * ratio_scale,
-        #     dup_last(err[1] / denom) * ratio_scale,
-        #     alpha=0.2,
-        #     step="post",
-        #     facecolor=color,
-        # )
-
         # legend_objs.append((line_obj, fill_obj))
+
+        # if i > 0:
+        #     (line_obj,) = main_ax.step(
+        #         bins,
+        #         dup_last(y) * scale,
+        #         where="post",
+        #         color=color,
+        #         label=label,
+        #         lw=1.0,
+        #         zorder=i,
+        #     )
+        #     fill_obj = main_ax.fill_between(
+        #         bins,
+        #         # dup_last(y - err) * scale,
+        #         # dup_last(y + err) * scale,
+        #         dup_last(err[0]) * scale,
+        #         dup_last(err[1]) * scale,
+        #         alpha=0.2,
+        #         step="post",
+        #         facecolor=color,
+        #         zorder=i,
+        #     )
+        #     ratio_scale = denom.sum() / y.sum() if density else 1
+        #     ratio_ax.step(
+        #         bins,
+        #         dup_last(y / denom) * ratio_scale,
+        #         where="post",
+        #         color=color,
+        #         zorder=i,
+        #         lw=1.0,
+        #     )
+        #     ratio_ax.fill_between(
+        #         bins,
+        #         dup_last(err[0] / denom) * ratio_scale,
+        #         dup_last(err[1] / denom) * ratio_scale,
+        #         alpha=0.2,
+        #         step="post",
+        #         facecolor=color,
+        #         zorder=i,
+        #     )
+
+        #     legend_objs.append((line_obj, fill_obj))
+
+        # else:
+        #     bin_centers = 0.5 * (bins[1:] + bins[:-1])
+        #     point_obj = main_ax.errorbar(
+        #         bin_centers,
+        #         y * scale,
+        #         yerr=err * scale,
+        #         color=color,
+        #         label=label,
+        #         fmt="o",
+        #         zorder=len(ys) + 1,
+        #         ms=1.5,
+        #         elinewidth=1,
+        #     )
+        #     ratio_scale = 1  # denom.sum() / y.sum() if density else 1
+        #     ratio_ax.errorbar(
+        #         bin_centers,
+        #         y / denom * ratio_scale,
+        #         yerr=err / denom * ratio_scale,
+        #         color=color,
+        #         fmt="o",
+        #         zorder=len(ys) + 1,
+        #         ms=1.5,
+        #         elinewidth=1,
+        #     )
+
+        #     legend_objs.append(point_obj)
+
+        fill_obj = main_ax.fill_between(
+            bins,
+            dup_last(err[0]) * scale,
+            dup_last(err[1]) * scale,
+            alpha=0.1 if i==0 else 0.2,
+            step="post",
+            facecolor=color,
+            zorder=i,
+        )
+        ratio_scale = denom.sum() / y.sum() if density else 1
+        ratio_ax.fill_between(
+            bins,
+            dup_last(err[0] / denom) * ratio_scale,
+            dup_last(err[1] / denom) * ratio_scale,
+            alpha=0.1 if i==0 else 0.2,
+            step="post",
+            facecolor=color,
+            zorder=i,
+        )
         if i > 0:
             (line_obj,) = main_ax.step(
                 bins,
@@ -493,65 +610,45 @@ def plot_reweighting_ensemble(
                 where="post",
                 color=color,
                 label=label,
-                lw=1.0,
+                lw=1.,
                 zorder=i,
             )
-            fill_obj = main_ax.fill_between(
-                bins,
-                dup_last(y - err) * scale,
-                dup_last(y + err) * scale,
-                alpha=0.2,
-                step="post",
-                facecolor=color,
-                zorder=i,
-            )
-            ratio_scale = denom.sum() / y.sum() if density else 1
             ratio_ax.step(
                 bins,
                 dup_last(y / denom) * ratio_scale,
                 where="post",
                 color=color,
                 zorder=i,
-                lw=1.0,
-            )
-            ratio_ax.fill_between(
-                bins,
-                dup_last((y - err) / denom) * ratio_scale,
-                dup_last((y + err) / denom) * ratio_scale,
-                alpha=0.2,
-                step="post",
-                facecolor=color,
-                zorder=i,
+                lw=1.,
             )
 
             legend_objs.append((line_obj, fill_obj))
 
         else:
             bin_centers = 0.5 * (bins[1:] + bins[:-1])
-            point_obj = main_ax.errorbar(
+            point_obj = main_ax.scatter(
                 bin_centers,
                 y * scale,
-                yerr=err * scale,
+                # yerr=err * scale,
                 color=color,
                 label=label,
-                fmt='o',
-                zorder=len(ys)+1,
-                ms=1.5,
-                elinewidth=1,
+                # fmt="o",
+                zorder=len(ys) + 1,
+                s=1.5,
+                # elinewidth=1,
             )
-            ratio_scale = denom.sum() / y.sum() if density else 1
-            ratio_ax.errorbar(
+            ratio_ax.scatter(
                 bin_centers,
                 y / denom * ratio_scale,
-                yerr=err / denom * ratio_scale,
+                # yerr=err / denom * ratio_scale,
                 color=color,
-                fmt='o',
-                zorder=len(ys)+1,
-                ms=1.5,
-                elinewidth=1,
-            )            
+                # fmt="o",
+                zorder=len(ys) + 1,
+                s=1.5,
+                # elinewidth=1,
+            )
 
-            legend_objs.append(point_obj)           
+            legend_objs.append(point_obj)  
 
     # scales
     if logx:

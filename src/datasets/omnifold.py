@@ -24,6 +24,7 @@ class OmniFoldData(UnfoldingData):
         device: Optional[torch.device] = None,
         correction_weights: Optional[str] = None,
         exclusions=("particles", "Zs", "lhas"),
+        data_key: str = "Herwig",
     ):
 
         ef = importlib.import_module("energyflow")
@@ -33,7 +34,7 @@ class OmniFoldData(UnfoldingData):
 
         dicts = [
             ef.zjets_delphes.load("Pythia21", **load_kwargs),  # "Sim"
-            ef.zjets_delphes.load("Herwig", **load_kwargs),  # "Data"
+            ef.zjets_delphes.load(data_key, **load_kwargs),  # "Data"
         ]
 
         batch_size = 0
@@ -69,10 +70,10 @@ class OmniFoldData(UnfoldingData):
                 tensor_kwargs[k].append(tensor)
 
             # construct correction weights for data
-            tensor_kwargs["sample_weights"].append(
-                torch.from_numpy(np.load(correction_weights)).float()
+            tensor_kwargs["sample_logweights"].append(
+                torch.from_numpy(np.load(correction_weights)[:size]).float().log()
                 if (correction_weights and i)
-                else torch.full([size], 1, dtype=torch.float32)
+                else torch.full([size], 0, dtype=torch.float32)
             )
 
             batch_size += size
@@ -90,13 +91,21 @@ class OmniFoldProcess:
     num_features: int = 6
     transforms: Tuple[Callable] = (
         OmniFoldTransform(
-            shift_x=torch.tensor([2.7727, 2.8380, -2.0688, -0.4431, -6.7655, 0.2401]),
-            scale_x=torch.tensor([0.5247, 0.4587, 0.6379, 0.3688, 2.3824, 0.1188]),
-            shift_z=torch.tensor([2.9788, 3.1999, -2.2242, -0.3680, -7.0247, 0.2337]),
-            scale_z=torch.tensor([0.4525, 0.3994, 0.6832, 0.3327, 2.3020, 0.1152]),
+            shift_x=torch.tensor(
+                [2.7727, 2.8380, -2.0688, -0.4431, -6.7655, 0.2401]
+            ),
+            scale_x=torch.tensor(
+                [0.5247, 0.4587, 0.6379, 0.3688, 2.3824, 0.1188]
+            ),
+            shift_z=torch.tensor(
+                [2.9788, 3.1999, -2.2242, -0.3680, -7.0247, 0.2337]
+            ),
+            scale_z=torch.tensor(
+                [0.4525, 0.3994, 0.6832, 0.3327, 2.3020, 0.1152]
+            ),
         ),
     )
-    observables: Tuple[Observable] = (
+    observables_x: Tuple[Observable] = (
         Observable(
             name="mass",
             compute=lambda x: x[..., 0],
@@ -137,3 +146,44 @@ class OmniFoldProcess:
             xlims=(0.08, 0.52),
         ),
     )
+    observables_z: Tuple[Observable] = (
+        Observable(
+            name="mass",
+            compute=lambda z: z[..., 0],
+            label=r"$\text{Jet mass } m$",
+            logy=True,
+            xlims=(1, 60),
+        ),
+        Observable(
+            name="mult",
+            compute=lambda z: z[..., 1],
+            label=r"$\text{Jet multiplicity } N$",
+            discrete=2,
+            xlims=(0, 60),
+        ),
+        Observable(
+            name="width",
+            compute=lambda z: z[..., 2],
+            label=r"$\text{Jet width } w$",
+            logy=True,
+            xlims=(0, 0.6),
+        ),
+        Observable(
+            name="tau_21",
+            compute=lambda z: z[..., 3],
+            label=r"$\text{N-subjettiness ratio } \tau_{21}$",
+            xlims=(0.1, 1.1),
+        ),
+        Observable(
+            name="log_rho",
+            compute=lambda z: z[..., 4],
+            label=r"$\text{Groomed mass }\log \rho$",
+            xlims=(-14, -2),
+        ),
+        Observable(
+            name="zg",
+            compute=lambda z: z[..., 5],
+            label=r"$\text{Groomed momentum fraction }z_g$",
+            xlims=(0.08, 0.52),
+        ),
+    )    

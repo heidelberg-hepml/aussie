@@ -1,0 +1,14 @@
+# @package _global_
+defaults:
+  - /unf
+  - override /dataset: omnifold_corrected
+  - _self_
+
+net:
+  ensembled: 20
+
+training:
+  lr: 1e-4
+  optimizer:
+    warmup_steps: 5000
+    betas: [0.90,0.999]

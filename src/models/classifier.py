@@ -37,10 +37,11 @@ class Classifier(Model):
             case _:
                 raise ValueError
 
-        # correction weights
-        correction = batch.sample_weights
-        if correction is not None:
-            loss_dat = loss_dat * correction[~mask_sim]
+        # sample weights
+        if batch.sample_logweights is not None:
+            sample_weights = batch.sample_logweights.exp()
+            loss_dat = loss_dat * sample_weights[~mask_sim]
+            loss_sim = loss_sim * sample_weights[mask_sim]
 
         # average loss
         mean_dims = (0, 1) if self.ensembled else 0

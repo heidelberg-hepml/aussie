@@ -6,6 +6,8 @@ defaults:
 run_name: classify_${dataset.name}
 experiment: ClassificationExperiment
 
+prev_it_path: null
+
 loss: bce
 bayesian: false
 

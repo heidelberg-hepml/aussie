@@ -66,11 +66,19 @@ class GaussianToyData(UnfoldingData):
 class GaussianToyProcess:
     num_features: int = 1
     transforms: Tuple[Callable] = ()
-    observables: Tuple[Observable] = (
+    observables_x: Tuple[Observable] = (
         Observable(
             name="gaussian",
             compute=lambda x: x[..., 0],
-            label=r"$x/z$",
+            label=r"$x$",
+            qlims=(1e-2, 1 - 1e-2),
+        ),
+    )
+    observables_z: Tuple[Observable] = (
+        Observable(
+            name="gaussian",
+            compute=lambda z: z[..., 0],
+            label=r"$z$",
             qlims=(1e-2, 1 - 1e-2),
         ),
     )
