@@ -17,10 +17,10 @@ joint_ensembling: false
 model:
   _target_: src.models.Unfolder
 
-net:
-  dim_in: ${dataset.dim}
-  dim_out: 1
-  bayesian: ${bayesian}
+# net:
+#   dim_in: ${dataset.dim}
+#   dim_out: 1
+#   bayesian: ${bayesian}
 
 training:
   lr: 1e-3

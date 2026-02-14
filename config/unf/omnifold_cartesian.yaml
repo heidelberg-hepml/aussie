@@ -1,0 +1,25 @@
+# @package _global_
+defaults:
+  - /unf
+  - override /net: lgatr
+  - override /dataset: omnifold_cartesian
+  - _self_
+
+norm: l1
+
+data:
+  on_gpu: false
+
+net:
+  backbone:
+    hidden_v_channels: 16
+    hidden_s_channels: 64
+    num_blocks: 4
+    num_heads: 4
+  
+training:
+  lr: 0.005
+  batch_size: 256
+  optimizer:
+    warmup_steps: 5000
+    weight_decay: 0.0

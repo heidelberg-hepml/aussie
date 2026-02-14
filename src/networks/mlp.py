@@ -30,6 +30,7 @@ class MLP(nn.Module):
 
         units = [dim_in, *(num_hidden_layers * [hidden_channels]), dim_out]
 
+        self.dim_in = dim_in
         self.bayesian = bayesian
         self.ensembled = ensembled
         linear_layer = (

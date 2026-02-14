@@ -10,7 +10,7 @@ from torch.func import functional_call
 from src.models.classifier import Classifier
 from src.models.base_model import Model
 from src.datasets import UnfoldingData
-from src.networks import TransformerEncoder
+from src.networks import TransformerEncoder, LGATr
 from src.utils.utils import load_model
 
 # log = logging.getLogger("Model")
@@ -44,7 +44,7 @@ class Unfolder(Model):
 
     @property
     def lowlevel(self):
-        return isinstance(self.net, TransformerEncoder)
+        return isinstance(self.net, (TransformerEncoder, LGATr))
 
     def forward(self, batch: UnfoldingData):
         """Return the part-level data-to-sim log-likelihood ratio"""
@@ -112,6 +112,7 @@ class Unfolder(Model):
                 create_graph=True,
                 grad_outputs=grad_outputs,
                 is_grads_batched=self.ensembled,
+                # allow_unused=True,
             )
 
         # sum gradient norms
@@ -121,7 +122,9 @@ class Unfolder(Model):
             case "l2":
                 norm = lambda g: g.pow(2)
 
-        loss_gradnorm = sum(norm(g).sum() for g in grads_x) / self.num_params_cls
+        loss_gradnorm = (
+            sum(norm(g).sum() for g in grads_x if g is not None) / self.num_params_cls
+        )
 
         self.log_scalar(loss_reg, "loss_reg")
         self.log_scalar(loss_gradnorm, "loss_gradnorm")
@@ -136,7 +139,7 @@ class Unfolder(Model):
 
     @property
     def trainable_parameters(self):
-        return (p for p in self.net.parameters() if p.requires_grad)
+        return (p for p in self.net.parameters() if (p.requires_grad and p.numel() > 0))
 
 
 class OmniFolder(Model):
@@ -165,7 +168,7 @@ class OmniFolder(Model):
 
     @property
     def lowlevel(self):
-        return isinstance(self.net, TransformerEncoder)
+        return isinstance(self.net, (TransformerEncoder, LGATr))
 
     def forward(self, batch: UnfoldingData):
         """Return the part-level data-to-sim log-likelihood ratio"""

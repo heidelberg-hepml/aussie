@@ -47,15 +47,12 @@ class TrainingExperiment(BaseExperiment):
             )
             trainer.run_training()
 
-            del self.dataloaders
-            torch.cuda.empty_cache()
+            if not self.cfg.evaluate:
+                del self.dataloaders
+                torch.cuda.empty_cache()
 
         # evaluate model
         if self.cfg.evaluate:
-
-            self.dataloaders = dict(
-                zip(("train", "val", "test"), self.init_dataloader())
-            )
 
             # load model state
             self.log.info(f"Loading model state from {self.exp_dir}.")
@@ -102,7 +99,6 @@ class TrainingExperiment(BaseExperiment):
 
         # preprocess (on cpu)
         for transform in self.process.transforms:
-            # transform = transform.to(dset.device)
             dset = transform.forward(dset)
 
         # optionally move dataset to gpu

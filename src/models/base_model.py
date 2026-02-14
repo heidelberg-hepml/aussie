@@ -41,7 +41,7 @@ class Model(nn.Module):
 
     @property
     def trainable_parameters(self):
-        return (p for p in self.parameters() if p.requires_grad)
+        return (p for p in self.parameters() if (p.requires_grad and p.numel() > 0))
 
     @property
     def kld(self):
@@ -75,7 +75,7 @@ class Model(nn.Module):
 
         # # zero parameter gradients
         # optimizer.zero_grad(set_to_none=True)
-        
+
     def log_scalar(self, x: torch.Tensor, name: str):
         if self.net.training:
             self.log_buffer[name].append(x.detach())
