@@ -1,7 +1,7 @@
 import torch
 from tensordict import tensorclass
 from typing import Optional
-
+from lgatr import get_spurions
 from src.utils.utils import cartesian2jet
 
 
@@ -26,11 +26,13 @@ class LogScale:
 
     @staticmethod
     def forward(x, indices, eps=1e-6):
-        return x[..., indices].add(eps).log()
+        x[..., indices] = x[..., indices].add(eps).log()
+        return x
 
     @staticmethod
     def reverse(x, indices):
-        return x[..., indices].exp()
+        x[..., indices] = x[..., indices].exp()
+        return x
 
 
 class MomentumTransform:
@@ -50,6 +52,125 @@ class MomentumTransform:
         m2 = (E**2 - p2).clamp(min=0)
 
         return torch.stack([m2.add(eps).log(), pt2.add(eps).log(), eta, phi], dim=-1)
+
+    @staticmethod
+    def reverse(x):
+        raise NotImplementedError
+
+
+def lorentz_inner(v1, v2):
+    """Lorentz inner product, i.e v1^T @ g @ v2
+
+    Parameters
+    ----------
+    v1, v2 : torch.Tensor
+        Tensors of shape (..., 4)
+
+    Returns
+    -------
+    torch.Tensor
+        Lorentz inner product of shape (..., )
+    """
+    t = v1[..., 0] * v2[..., 0]
+    s = (v1[..., 1:] * v2[..., 1:]).sum(dim=-1)
+    return t - s
+
+
+def lorentz_squarednorm(v):
+    """Lorentz norm, i.e. v^T @ g @ v
+
+    Parameters
+    ----------
+    v : torch.Tensor
+        Tensor of shape (..., 4)
+
+    Returns
+    -------
+    torch.Tensor
+        Lorentz norm of shape (..., )
+    """
+    return lorentz_inner(v, v)
+
+
+def restframe_boost(fourmomenta, checks=False):
+    """Construct a Lorentz transformation that boosts four-momenta into their rest frame.
+
+    Parameters
+    ----------
+    fourmomenta : torch.Tensor
+        Tensor of shape (..., 4) representing the four-momenta.
+    checks : bool
+        If True, perform additional assertion checks on predicted vectors.
+        It may cause slowdowns due to GPU/CPU synchronization, use only for debugging.
+
+    Returns
+    -------
+    trafo : torch.Tensor
+        Tensor of shape (..., 4, 4) representing the Lorentz transformation
+        that boosts the four-momenta into their rest frame.
+    """
+    if checks:
+        assert (
+            lorentz_squarednorm(fourmomenta) > 0
+        ).all(), "Trying to boost spacelike vectors into their restframe (not possible). Consider changing the nonlinearity in equivectors."
+
+    # compute relevant quantities
+    t0 = fourmomenta.narrow(-1, 0, 1)
+    beta = fourmomenta[..., 1:] / t0.clamp_min(1e-10)
+    beta2 = beta.square().sum(dim=-1, keepdim=True)
+    one_minus_beta2 = torch.clamp_min(1 - beta2, min=1e-10)
+    gamma = torch.rsqrt(one_minus_beta2)
+    boost = -gamma * beta
+
+    # prepare rotation part
+    eye3 = torch.eye(3, device=fourmomenta.device, dtype=fourmomenta.dtype)
+    eye3 = eye3.reshape(*(1,) * len(fourmomenta.shape[:-1]), 3, 3).expand(
+        *fourmomenta.shape[:-1], 3, 3
+    )
+    scale = (gamma - 1) / torch.clamp_min(beta2, min=1e-10)
+    outer = beta.unsqueeze(-1) * beta.unsqueeze(-2)
+    rot = eye3 + scale.unsqueeze(-1) * outer
+
+    # collect trafo
+    row0 = torch.cat((gamma, boost), dim=-1)
+    lower = torch.cat((boost.unsqueeze(-1), rot), dim=-1)
+    trafo = torch.cat((row0.unsqueeze(-2), lower), dim=-2)
+    return trafo
+
+
+class LorentzTransform:
+    """
+    TODO
+    """
+
+    @staticmethod
+    def forward(features, boost_momenta=None, mask=None, eps=1e-4):
+
+        B = len(features)
+
+        vectors, scalars = features[..., :4], features[..., 4:]
+
+        # create reference features
+        ref_vectors = get_spurions(beam_spurion="lightlike")[..., 1:5]  # (3, 4)
+        ref_scalars = -torch.ones_like(scalars[:, [0]])  # (B, 1, C)
+
+        # concat with particle features
+        vectors = torch.cat([ref_vectors[None, ...].expand(B, -1, -1), vectors], dim=1)
+        scalars = torch.cat([ref_scalars.expand(-1, 3, -1), scalars], dim=1)
+
+        if boost_momenta is not None:
+            # boost vectors to rest frame
+            boost = restframe_boost(boost_momenta)
+            vectors = torch.einsum("ijk,ilk->ilj", boost, vectors)
+
+        # concat with particle features
+        features = torch.cat([vectors, scalars], dim=2)
+
+        if mask is not None:
+            # update mask
+            mask = torch.nn.functional.pad(mask, (3, 0), value=1)
+
+        return features, mask
 
     @staticmethod
     def reverse(x):
@@ -96,6 +217,47 @@ class OmniFoldTransform:
         batch.z = ShiftAndScale.reverse(batch.z, shift=self.shift_z, scale=self.scale_z)
         batch.z[:, :4] = batch.z[:, :4].exp().sub(self.eps)
         batch.z[:, 1] = batch.z[:, 1].round()
+
+        return batch
+
+
+@tensorclass
+class OmniFoldObsTransform:
+    """
+    TODO
+    """
+
+    shift_x: torch.Tensor
+    shift_z: torch.Tensor
+    scale_x: torch.Tensor
+    scale_z: torch.Tensor
+    eps: float = 1e-3
+
+    def forward(self, batch):
+
+        # process reco level
+        batch.x[:, 4] = 1 - batch.x[:, 4]
+        batch.x = LogScale.forward(batch.x, indices=[0, 1, 3, 4], eps=self.eps)
+        batch.x = ShiftAndScale.forward(batch.x, shift=self.shift_x, scale=self.scale_x)
+
+        # process part level
+        batch.z[:, 4] = 1 - batch.z[:, 4]
+        batch.z = LogScale.forward(batch.z, indices=[0, 1, 3, 4], eps=self.eps)
+        batch.z = ShiftAndScale.forward(batch.z, shift=self.shift_z, scale=self.scale_z)
+
+        return batch
+
+    def reverse(self, batch):
+
+        # process reco level
+        batch.x = ShiftAndScale.reverse(batch.x, shift=self.shift_x, scale=self.scale_x)
+        batch.x = LogScale.reverse(batch.x, indices=[0, 1, 3, 4], eps=self.eps)
+        batch.x[:, 4] = 1 - batch.x[:, 4]
+
+        # process part level
+        batch.z = ShiftAndScale.reverse(batch.z, shift=self.shift_z, scale=self.scale_z)
+        batch.z = LogScale.reverse(batch.x, indices=[0, 1, 3, 4], eps=self.eps)
+        batch.z[:, 4] = 1 - batch.z[:, 4]
 
         return batch
 
@@ -351,6 +513,67 @@ class YukawaTransform:
         return batch
 
 
+@tensorclass
+class YukawaEquiTransform:
+    """
+    TODO
+    """
+
+    scale_x: torch.Tensor
+    scale_z: torch.Tensor
+    eps: float = 1e-4
+
+    def forward(self, batch):
+
+        batch.x /= self.scale_x
+        batch.z /= self.scale_z
+
+        # create particle ids
+        ids_x = torch.eye(4, device=batch.device)[
+            None, [0, 1, 2, 3, 3, 3, 3, 3], :
+        ].expand(len(batch), -1, -1)
+        ids_z = torch.eye(3, device=batch.device)[None, [0, 1, 2], :].expand(
+            len(batch), -1, -1
+        )
+        batch.x = torch.cat([batch.x, ids_x], dim=2)
+        batch.z = torch.cat([batch.z, ids_z], dim=2)
+
+        batch.x, batch.mask_x = LorentzTransform.forward(batch.x, mask=batch.mask_x)
+        batch.z, batch.mask_z = LorentzTransform.forward(batch.z, mask=batch.mask_z)
+
+        return batch
+
+    def reverse(self, batch):
+        raise NotImplementedError
+        return batch
+
+
+@tensorclass
+class YukawaAcceptanceTransform:
+    """
+    TODO
+    """
+
+    scale: torch.Tensor
+    eps: float = 1e-4
+
+    def forward(self, batch):
+
+        batch.x /= self.scale
+
+        # create particle ids
+        ids = torch.eye(3, device=batch.device)[None, [0, 1, 2], :].expand(
+            len(batch), -1, -1
+        )
+        batch.x = torch.cat([batch.x, ids], dim=2)
+
+        return batch
+
+    def reverse(self, batch):
+        raise NotImplementedError
+        return batch
+
+
 def compute_invariant_mass(p, particles) -> torch.Tensor:
 
     px_sum = 0
@@ -421,5 +644,38 @@ class ttbarRawTransform:
     def reverse(self, batch):
 
         raise NotImplementedError
+
+        return batch
+
+
+@tensorclass
+class OmniFoldCartesianTransform:
+    """
+    TODO
+    """
+
+    def forward(self, batch):
+
+        # # scale down vectors
+        # batch.x[..., :4] = batch.x[..., :4].divide(self.scale_v)
+        # batch.z[..., :4] = batch.z[..., :4].divide(self.scale_v)
+
+        batch.x, batch.mask_x = LorentzTransform.forward(
+            batch.x, batch.cond_x, batch.mask_x
+        )
+        batch.z, batch.mask_z = LorentzTransform.forward(
+            batch.z, batch.cond_z, batch.mask_z
+        )
+
+        return batch
+
+    def reverse(self, batch):
+
+        batch.x, batch.mask_x = LorentzTransform.reverse(
+            batch.x, batch.cond_x, batch.mask_x
+        )
+        batch.z, batch.mask_z = LorentzTransform.reverse(
+            batch.z, batch.cond_z, batch.mask_z
+        )
 
         return batch
