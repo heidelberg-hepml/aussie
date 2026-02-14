@@ -263,6 +263,51 @@ class YukawaProcess:
     )
 
 
+@dataclass
+class YukawaEquiProcess:
+
+    num_features: int = 16
+    transforms: Tuple[Callable] = (
+        YukawaEquiTransform(
+            scale_x=140.0,
+            scale_z=450.0,
+        ),
+    )
+    observables_z: Tuple[Observable] = tuple(
+        momenta_to_observables(
+            particle_names=["t", "h", "j"],
+            delta_pairs=[(0, 1), (1, 2), (0, 2)],
+            hard_scattering=True,
+            off_shell=[False, False, False],
+        )
+    )
+    observables_x: Tuple[Observable] = tuple(
+        momenta_to_observables(
+            particle_names=[r"\gamma_1", r"\gamma_2", r"j_b", r"j_1", r"j_2", r"j_3"]
+            + [f"j_{{{i}}}" for i in range(4, 6)],
+            delta_pairs=[(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)],
+            hard_scattering=False,
+            off_shell=[0, 0] + [None] * 6,
+        )
+    )
+
+
+@dataclass
+class YukawaAcceptanceProcess:
+
+    num_features: int = 4
+    transforms: Tuple[Callable] = (YukawaAcceptanceTransform(scale=450.0),)
+    observables_x: Tuple[Observable] = tuple(
+        momenta_to_observables(
+            particle_names=["t", "h", "j"],
+            delta_pairs=[(0, 1), (1, 2), (0, 2)],
+            hard_scattering=True,
+            off_shell=[False, False, False],
+        )
+    )
+    observables_z: Tuple[Observable] = tuple()
+
+
 # class LoThjProcess(Process):
 #     def __init__(self, params: dict, device: torch.device):
 #         self.params = params
