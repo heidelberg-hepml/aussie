@@ -10,7 +10,11 @@ from typing import Callable, Tuple, Optional
 
 from src.datasets.base_dataset import UnfoldingData
 from src.utils.observable import Observable
-from src.utils.transforms import YukawaTransform
+from src.utils.transforms import (
+    YukawaTransform,
+    YukawaEquiTransform,
+    YukawaAcceptanceTransform,
+)
 
 
 @tensorclass
