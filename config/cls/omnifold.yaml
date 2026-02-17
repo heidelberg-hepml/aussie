@@ -4,9 +4,11 @@ defaults:
   - _self_
 
 net:
+  dim_in: ${dataset.process.num_features}
+  dim_out: 1
   ensembled: 64
 
 training:
   optimizer:
     warmup_steps: 5000
-    weight_decay: 0.03
+    weight_decay: 0.0

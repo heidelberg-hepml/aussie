@@ -1,8 +1,7 @@
 name: omnifold_cartesian
-dim: 4
 reader:
   _target_: src.datasets.OmniFoldCartesianData.read
   path: /remote/gpu02/ore/data/energyflow
   observables_path: /remote/gpu02/ore/station/data
 process:
-  _target_: src.datasets.OmniFoldCartesianProcess
+  _target_: src.datasets.OmniFoldCartesianProcess  

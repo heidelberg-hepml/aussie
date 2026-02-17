@@ -1,7 +1,8 @@
 name: omnifold_particle
-dim: 4
 reader:
   _target_: src.datasets.OmniFoldParticleData.read
   path: /remote/gpu02/ore/data/energyflow
+  observables_path: /remote/gpu02/ore/station/data
 process:
   _target_: src.datasets.OmniFoldParticleProcess
+  num_features: 4

@@ -15,6 +15,8 @@ dataset:
     _target_: src.datasets.OmniFoldParticleCondProcess
 
 net:
+  dim_in: ${dataset.process.num_features}
+  dim_out: 1
   dim_cond: 4
 
 training:
@@ -22,4 +24,4 @@ training:
   test_batch_size: 256
   optimizer:
     warmup_steps: 5000
-    weight_decay: 0.03
+    weight_decay: 0.0

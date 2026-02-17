@@ -1,8 +1,8 @@
 name: omnifold_corrected
-dim: 6
 reader:
   _target_: src.datasets.OmniFoldData.read
   path: /remote/gpu02/ore/data/energyflow
   correction_weights: /remote/gpu02/ore/station/data/correction_weights_omnifold.npy
 process:
   _target_: src.datasets.OmniFoldProcess
+  num_features: 6  

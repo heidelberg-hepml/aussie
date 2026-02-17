@@ -18,7 +18,10 @@ pyplot_cfg = {
     "savefig.dpi": 300,
     "text.usetex": True,
     "text.latex.preamble": (
-        r"\usepackage{amsmath}" r"\usepackage[bitstream-charter]{mathdesign}"
+        r"\usepackage{amsmath}"
+        r"\usepackage[bitstream-charter]{mathdesign}"
+        r"\DeclareSymbolFont{usualmathcal}{OMS}{cmsy}{m}{n}"
+        r"\DeclareSymbolFontAlphabet{\mathcal}{usualmathcal}"
     ),
     "xtick.labelsize": 14,
     "ytick.labelsize": 14,
@@ -136,8 +139,9 @@ def plot_reweighting(
     legend_objs, legend_labels = [], []
     for i, (y, err, label, color) in enumerate(zip(ys, errs, labels, colors)):
 
-        if (i==1) and not show_sim: continue
-        
+        if (i == 1) and not show_sim:
+            continue
+
         if add_chi2 and (label in labels_rew):
             if density:
                 pull = (y / y.sum() - y_exp / y_exp.sum()) / np.sqrt(
@@ -333,7 +337,7 @@ def plot_reweighting(
                 # elinewidth=1,
             )
 
-            legend_objs.append(point_obj)        
+            legend_objs.append(point_obj)
 
     # scales
     if logx:
@@ -443,7 +447,10 @@ def plot_reweighting_ensemble(
         norm_exp = y_exp.sum()
         y_exp = y_exp / norm_exp
         sum_w2s = sum_w2s / (norm_exp**2)
-    err_exp = (y_exp - np.sqrt(sum_w2s), y_exp + np.sqrt(sum_w2s)) # only if not using plt.errorbar for data
+    err_exp = (
+        y_exp - np.sqrt(sum_w2s),
+        y_exp + np.sqrt(sum_w2s),
+    )  # only if not using plt.errorbar for data
     # err_exp = np.sqrt(sum_w2s)
 
     y_sim = np.histogram(sim, bins=bins)[0]
@@ -502,7 +509,8 @@ def plot_reweighting_ensemble(
     legend_objs, legend_labels = [], []
     for i, (y, err, label, color) in enumerate(zip(ys, errs, labels, colors)):
 
-        if (i==1) and not show_sim: continue
+        if (i == 1) and not show_sim:
+            continue
 
         legend_labels.append(label)
 
@@ -588,7 +596,7 @@ def plot_reweighting_ensemble(
             bins,
             dup_last(err[0]) * scale,
             dup_last(err[1]) * scale,
-            alpha=0.1 if i==0 else 0.2,
+            alpha=0.1 if i == 0 else 0.2,
             step="post",
             facecolor=color,
             zorder=i,
@@ -598,7 +606,7 @@ def plot_reweighting_ensemble(
             bins,
             dup_last(err[0] / denom) * ratio_scale,
             dup_last(err[1] / denom) * ratio_scale,
-            alpha=0.1 if i==0 else 0.2,
+            alpha=0.1 if i == 0 else 0.2,
             step="post",
             facecolor=color,
             zorder=i,
@@ -610,7 +618,7 @@ def plot_reweighting_ensemble(
                 where="post",
                 color=color,
                 label=label,
-                lw=1.,
+                lw=1.0,
                 zorder=i,
             )
             ratio_ax.step(
@@ -619,7 +627,7 @@ def plot_reweighting_ensemble(
                 where="post",
                 color=color,
                 zorder=i,
-                lw=1.,
+                lw=1.0,
             )
 
             legend_objs.append((line_obj, fill_obj))
@@ -648,7 +656,7 @@ def plot_reweighting_ensemble(
                 # elinewidth=1,
             )
 
-            legend_objs.append(point_obj)  
+            legend_objs.append(point_obj)
 
     # scales
     if logx:

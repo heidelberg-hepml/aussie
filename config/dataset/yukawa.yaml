@@ -1,7 +1,7 @@
 name: yukawa
-dim: 16
 reader:
   _target_: src.datasets.YukawaData.read
   path: /remote/gpu07/huetsch/memennto/data
 process:
   _target_: src.datasets.YukawaProcess
+  num_features: 16

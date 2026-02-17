@@ -47,12 +47,17 @@ class TrainingExperiment(BaseExperiment):
             )
             trainer.run_training()
 
-            if not self.cfg.evaluate:
-                del self.dataloaders
-                torch.cuda.empty_cache()
+            del self.dataloaders
+            torch.cuda.empty_cache()
 
         # evaluate model
         if self.cfg.evaluate:
+
+            # initialize dataloaders (without drop_last)
+            self.log.info(f"Creating dataLoaders")
+            self.dataloaders = dict(
+                zip(("train", "val", "test"), self.init_dataloader(training=False))
+            )
 
             # load model state
             self.log.info(f"Loading model state from {self.exp_dir}.")

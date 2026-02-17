@@ -25,7 +25,7 @@ training:
   batch_size: 1024
   patience: 50
   optimizer:
-    weight_decay: 0.01
+    weight_decay: 0.0
     # warmup_steps: 5000
 
 data:

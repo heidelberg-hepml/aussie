@@ -236,13 +236,13 @@ class OmniFoldObsTransform:
     def forward(self, batch):
 
         # process reco level
-        batch.x[:, 4] = 1 - batch.x[:, 4]
-        batch.x = LogScale.forward(batch.x, indices=[0, 1, 3, 4], eps=self.eps)
+        batch.x[:, 3] = 1 - batch.x[:, 3]
+        batch.x = LogScale.forward(batch.x, indices=[0, 2, 3], eps=self.eps)
         batch.x = ShiftAndScale.forward(batch.x, shift=self.shift_x, scale=self.scale_x)
 
         # process part level
-        batch.z[:, 4] = 1 - batch.z[:, 4]
-        batch.z = LogScale.forward(batch.z, indices=[0, 1, 3, 4], eps=self.eps)
+        batch.z[:, 3] = 1 - batch.z[:, 3]
+        batch.z = LogScale.forward(batch.z, indices=[0, 2, 3], eps=self.eps)
         batch.z = ShiftAndScale.forward(batch.z, shift=self.shift_z, scale=self.scale_z)
 
         return batch
@@ -251,13 +251,13 @@ class OmniFoldObsTransform:
 
         # process reco level
         batch.x = ShiftAndScale.reverse(batch.x, shift=self.shift_x, scale=self.scale_x)
-        batch.x = LogScale.reverse(batch.x, indices=[0, 1, 3, 4], eps=self.eps)
-        batch.x[:, 4] = 1 - batch.x[:, 4]
+        batch.x = LogScale.reverse(batch.x, indices=[0, 2, 3], eps=self.eps)
+        batch.x[:, 3] = 1 - batch.x[:, 3]
 
         # process part level
         batch.z = ShiftAndScale.reverse(batch.z, shift=self.shift_z, scale=self.scale_z)
-        batch.z = LogScale.reverse(batch.x, indices=[0, 1, 3, 4], eps=self.eps)
-        batch.z[:, 4] = 1 - batch.z[:, 4]
+        batch.z = LogScale.reverse(batch.x, indices=[0, 2, 3], eps=self.eps)
+        batch.z[:, 3] = 1 - batch.z[:, 3]
 
         return batch
 

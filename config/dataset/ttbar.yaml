@@ -1,5 +1,4 @@
 name: ttbar
-dim: 16
 reader:
   _target_: src.datasets.ttbarData.read
   path: /remote/gpu02/ore/theofold/data
@@ -7,4 +6,5 @@ reader:
   ms_sim: [1695,1755]
 process:
   _target_: src.datasets.ttbarProcess
+  num_features: 16  
 

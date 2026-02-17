@@ -30,3 +30,4 @@ training:
   test_batch_size: 4096
   optimizer:
     warmup_steps: 5000
+    weight_decay: 0.0    

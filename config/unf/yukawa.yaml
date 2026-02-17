@@ -19,6 +19,7 @@ dataset:
 
 net:
   dim_in: 3
+  dim_out: 1
   encode_pos: true
   
 training:
