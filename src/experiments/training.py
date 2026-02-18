@@ -17,13 +17,13 @@ class TrainingExperiment(BaseExperiment):
         # preprocessing and observables
         self.process = instantiate(self.cfg.dataset.process)
 
-        if self.cfg.train or self.cfg.evaluate:
+        if self.cfg.train:
 
             # model
             if not hasattr(self, "model"):
                 self.init_model()
 
-            # initialize train/val dataloaders
+            # initialize dataloaders in train mode
             self.log.info(f"Creating dataLoaders")
             self.dataloaders = dict(
                 zip(("train", "val", "test"), self.init_dataloader(training=True))
@@ -52,6 +52,10 @@ class TrainingExperiment(BaseExperiment):
 
         # evaluate model
         if self.cfg.evaluate:
+
+            # model
+            if not hasattr(self, "model"):
+                self.init_model()
 
             # initialize dataloaders (without drop_last)
             self.log.info(f"Creating dataLoaders")
