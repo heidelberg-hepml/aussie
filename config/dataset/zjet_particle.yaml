@@ -1,8 +1,8 @@
-name: omnifold_particle
+name: zjet_particle
 reader:
-  _target_: src.datasets.OmniFoldParticleData.read
+  _target_: src.datasets.ZJetParticleData.read
   path: /remote/gpu02/ore/data/energyflow
   observables_path: /remote/gpu02/ore/station/data
 process:
-  _target_: src.datasets.OmniFoldParticleProcess
+  _target_: src.datasets.ZJetParticleProcess  
   num_features: 4

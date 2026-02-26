@@ -1,15 +1,16 @@
 # @package _global_
 defaults:
-  - /cls
-  - override /dataset: omnifold_corrected
+  - /unf
+  - override /dataset: zjet_corrected
   - _self_
 
 net:
   dim_in: ${dataset.process.num_features}
   dim_out: 1
-  ensembled: 64
+  ensembled: 20
 
 training:
+  lr: 1e-4
   optimizer:
     warmup_steps: 5000
-    weight_decay: 0.0
+    betas: [0.90,0.999]
