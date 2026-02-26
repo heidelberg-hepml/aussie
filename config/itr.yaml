@@ -8,11 +8,5 @@ warm_start_unf: false
 cls_lr_decay: null
 unf_lr_decay: null
 
-unf:
-  model:
-    _target_: src.models.OmniFolder
-
 defaults:
   - default
-  - cls: gaussian
-  - unf: gaussian

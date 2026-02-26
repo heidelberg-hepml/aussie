@@ -5,3 +5,7 @@ defaults:
   - /unf@unf: zjet_corrected
   - override /dataset: zjet_corrected
   - _self_
+
+unf:
+  model:
+    _target_: src.models.OmniFolder

@@ -271,7 +271,7 @@ class YukawaProcess:
 
     num_features: int = 16
     transforms: Tuple[Callable] = (
-        YukawaEquiTransform(
+        YukawaTransform(
             scale_x=140.0,
             scale_z=450.0,
         ),

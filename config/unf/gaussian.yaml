@@ -11,7 +11,7 @@ net:
   dim_out: 1
   num_hidden_layers: 2
   hidden_channels: 32
-  ensembled: 64
+  ensembled: false
 
 training:
   lr: 5e-03

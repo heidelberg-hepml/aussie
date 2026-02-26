@@ -5,3 +5,7 @@ defaults:
   - /unf@unf: yukawa
   - override /dataset: yukawa
   - _self_
+
+unf:
+  model:
+    _target_: src.models.OmniFolder

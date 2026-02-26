@@ -88,7 +88,7 @@ class ZJetData(UnfoldingData):
 
 
 @tensorclass
-class ZjetTransform:
+class ZJetTransform:
     """
     TODO
     """

@@ -5,3 +5,7 @@ defaults:
   - /unf@unf: gaussian
   - override /dataset: gaussian
   - _self_
+
+unf:
+  model:
+    _target_: src.models.OmniFolder

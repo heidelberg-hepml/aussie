@@ -260,7 +260,7 @@ class RKHSUnfolder(Unfolder):
         # forward pass classifier
         self.classifier.eval()
         with torch.no_grad():
-            lw_x = self.classifier(batch).squeeze(-1)
+            lw_x = self.classifier(batch) #.squeeze(-1)
             if self.classifier.ensembled:
 
                 if self.cfg.joint_ensembling:

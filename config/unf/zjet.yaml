@@ -7,7 +7,7 @@ defaults:
 net:
   dim_in: ${dataset.process.num_features}
   dim_out: 1
-  ensembled: 20
+  ensembled: false
 
 training:
   lr: 5e-3

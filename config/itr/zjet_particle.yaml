@@ -5,3 +5,7 @@ defaults:
   - /unf@unf: zjet_particle
   - override /dataset: zjet_particle
   - _self_
+
+unf:
+  model:
+    _target_: src.models.OmniFolder
