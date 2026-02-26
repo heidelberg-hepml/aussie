@@ -23,8 +23,9 @@ class Unfolder(Model):
         self.classifier, self.cfg_classifier = load_model(
             self.cfg.cls_path, Classifier, freeze=False
         )
-        self.params_cls = dict(self.classifier.named_parameters())
-        self.num_params_cls = sum(p.numel() for p in self.params_cls.values())
+        # self.params_cls = dict(self.classifier.named_parameters())
+        self.params_cls = list(self.classifier.parameters())
+        self.num_params_cls = sum(p.numel() for p in self.params_cls)
 
         # logging
         self.log_buffer = defaultdict(list)
@@ -123,6 +124,10 @@ class Unfolder(Model):
                 else:
                     # average over classifier ensemble
                     lw_x = lw_x.mean(0)
+
+            if self.cfg.norm_target:
+                norm = lw_x.clone().detach().exp().mean()
+                lw_x -= norm.log()  # ensure norm is precisely 1 batchwise
 
             # calculate regression loss
             match self.cfg.loss:
@@ -324,30 +329,6 @@ class OmniFolder(Model):
 
 class RKHSUnfolder(Unfolder):
 
-    def rbf_kernel_matrix(self, X, Y=None, lengthscale=1.0, eps=1e-8):
-        """
-        Compute RBF (Gaussian) kernel matrix between X and Y:
-        K_ij = exp(-0.5 * ||x_i - y_j||^2 / lengthscale^2)
-        X: (N, d)
-        Y: (M, d) or None -> Y = X
-        Returns: (N, M)
-        """
-        if Y is None:
-            Y = X
-        # squared norms
-        X_sq = (X * X).sum(dim=-1, keepdim=True)  # (N,1)
-        Y_sq = (Y * Y).sum(dim=-1, keepdim=True)  # (M,1)
-        # pairwise squared distance: (N, M)
-        dist2 = X_sq - 2.0 * (X @ Y.transpose(-2, -1)) + Y_sq.transpose(-2, -1)
-
-        # numerical stability: clamp small negatives to zero
-        dist2 = torch.clamp(dist2, min=0.0)
-        K = torch.exp(-0.5 * dist2 / (lengthscale**2 + eps))  # gaussian kernel
-        # C = 2 * X.size(-1) * lengthscale**2 # inverse multiquadratic kernel
-        # K = C / (dist2 + C)  # inverse multiquadratic kernel
-
-        return K
-
     def batch_loss(self, batch: UnfoldingData):
 
         # restrict to simulation only
@@ -356,8 +337,7 @@ class RKHSUnfolder(Unfolder):
         # forward pass classifier
         self.classifier.eval()
         with torch.no_grad():
-            lw_x, aux_x = self._forward_classifier(batch)
-            # lw_x = lw_x.squeeze(-1)
+            lw_x = self.classifier(batch).squeeze(-1)
             if self.classifier.ensembled:
 
                 if self.cfg.joint_ensembling:
@@ -384,47 +364,30 @@ class RKHSUnfolder(Unfolder):
             loss_reg = loss_reg * batch.sample_logweights.exp().unsqueeze(-1)
 
         # compute kernel matrix K (N,N)
-        if self.lowlevel:
-            assert (
-                aux_x is not None
-            ), "Auxiliary features required for lowlevel RKHSUnfolder"
-            K = self.rbf_kernel_matrix(
-                aux_x[1:], None, lengthscale=self.cfg.scale
-            )  # (N,N)
-        else:
-            K = self.rbf_kernel_matrix(
-                batch.x,
-                None,
-                lengthscale=self.cfg.scale,
-            )  # (N,N)
+        # assert not self.lowlevel
+        dist = torch.cdist(batch.x, batch.x, p=self.cfg.kernel_p)  # (N, N)
+        K = torch.exp(-0.5 * dist.pow(2) / self.cfg.kernel_scale**2)
         K.diagonal().zero_()
 
-        # empirical RKHS quadratic loss: (1/N^2) r^T K r
-        # r^T K r = sum_{i,j} r_i K_ij r_j
-        # implement as (r.T @ K @ r) scalar
         B = len(batch)
-        # loss_quad = (r.transpose(-2, -1) @ K @ r).squeeze().abs().sqrt() / (B * (B - 1))
-        loss_quad = (loss_reg.transpose(-2, -1) @ K @ loss_reg).squeeze() / (
-            B * (B - 1)
-        )
+        norm2 = (loss_reg.transpose(-2, -1) @ K @ loss_reg).squeeze(-1) / (B * (B - 1))
 
-        loss_quad = loss_quad.clamp(min=0.0)
+        norm = norm2.clamp(0)  # numerical stability
 
         if self.net.ensembled:
-            loss_quad = loss_quad.sum(0)  # sum over ensemble members
+            norm = norm.sum(0)  # sum over ensemble members
 
-        # log the inverse regression loss
-        # with torch.no_grad():
-        #     loss_mlc = (-lw_z.exp() * lw_x - (1 - lw_x.exp())) / 2
-        # self.log_scalar(loss_mlc, "loss_mlc")
-        # with torch.no_grad():
-        #     loss_omnifold = (-lw_x.exp() * lw_z - (1 - lw_z.exp())) / 2
-        # self.log_scalar(loss_omnifold, "loss_omnifold")
+        # log the alternative losses
+        with torch.no_grad():
+            loss_mlc = (-lw_z.exp() * lw_x - (1 - lw_x.exp())) / 2
+            loss_omnifold = (-lw_x.exp() * lw_z - (1 - lw_z.exp())) / 2
+        self.log_scalar(loss_mlc.mean(), "loss_mlc")
+        self.log_scalar(loss_omnifold.mean(), "loss_omnifold")
 
         self.log_scalar(loss_reg.mean(), "r2_mean")
         self.log_scalar(K.sum() / (B * (B - 1)), "kernel_mean")
 
-        return loss_quad
+        return norm
 
 
 # class SmearUnfolder(Unfolder):

@@ -13,14 +13,10 @@ loss: mlc
 norm: l1
 bayesian: false
 joint_ensembling: false
+norm_target: false
 
 model:
   _target_: src.models.Unfolder
-
-# net:
-#   dim_in: ${dataset.dim}
-#   dim_out: 1
-#   bayesian: ${bayesian}
 
 training:
   lr: 1e-3

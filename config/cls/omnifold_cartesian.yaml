@@ -7,17 +7,21 @@ defaults:
 
 data:
   on_gpu: false
-  
+
 net:
   backbone:
-    hidden_v_channels: 16
+    hidden_v_channels: 32
     hidden_s_channels: 64
     num_blocks: 4
     num_heads: 4
+    mlp_ratio: 4
+    dropout_prob: 0.01
+  head:
+    layernorms: True
 
-#   ensembled: 64
 
 training:
+  batch_size: 256
   optimizer:
     warmup_steps: 5000
     weight_decay: 0.0

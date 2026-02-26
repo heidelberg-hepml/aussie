@@ -201,7 +201,7 @@ class UnfoldingExperiment(TrainingExperiment):
             )
             
             plt.subplots_adjust(top=0.9)
-            auc = roc_auc_score(1-labels, 1-preds, sample_weight=sample_weights)
+            auc = roc_auc_score(labels, preds, sample_weight=sample_weights)
             fig.suptitle(f"AUC = {auc:.5f}")
 
             pdf.savefig(fig)

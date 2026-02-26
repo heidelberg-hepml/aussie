@@ -50,7 +50,7 @@ class YukawaData(UnfoldingData):
 
                 momenta = d[..., start:stop].reshape(d.shape[0], -1, 4)
 
-                if k == "x":  # limit number of reco jets to 8
+                if k == "x":  # limit number of reco objects to 8
                     momenta = momenta[:, :8]
 
                 tensor = torch.from_numpy(momenta).float()
@@ -146,6 +146,7 @@ def momenta_to_observables(
                 compute=lambda p, i=i: compute_eta(p[..., i, :]),
                 label=f"$\\eta_{{{name}}}$",
                 unit=None,
+                logy=True,
                 qlims=(1e-3, 1 - 1e-3),
             )
         )
