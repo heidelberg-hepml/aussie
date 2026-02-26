@@ -1,7 +1,0 @@
-# @package _global_
-defaults:
-  - /itr
-  - /cls@cls: gaussian_toy
-  - /unf@unf: gaussian_toy
-  - override /dataset: gaussian_toy
-  - _self_

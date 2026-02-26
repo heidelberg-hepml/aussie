@@ -1,7 +1,0 @@
-# @package _global_
-defaults:
-  - /itr
-  - /cls@cls: yukawa
-  - /unf@unf: yukawa
-  - override /dataset: yukawa
-  - _self_

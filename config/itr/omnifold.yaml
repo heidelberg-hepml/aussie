@@ -1,7 +1,0 @@
-# @package _global_
-defaults:
-  - /itr
-  - /cls@cls: omnifold
-  - /unf@unf: omnifold
-  - override /dataset: omnifold
-  - _self_
