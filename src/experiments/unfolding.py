@@ -24,36 +24,24 @@ class UnfoldingExperiment(TrainingExperiment):
 
         self.model.eval()
 
+        predictions = {}
+
         # get predictions across the test set
-        predictions = defaultdict(list)
-        n_evals = self.cfg.num_bnn_samples if self.model.bayesian else 1
-        for _ in range(n_evals):
+        lw_z_sim = []
+        for batch in dataloader:
 
-            if self.model.bayesian:  # sample new bnn weights
-                self.model.reseed()
-
-            # collect predictions
-            lw_z_sim = []
-            for batch in dataloader:
-
-                batch_sim = batch[batch.labels == 0].to(self.device, non_blocking=True)
-                lw_sample = (
-                    0.0
-                    if batch_sim.sample_logweights is None
-                    else batch_sim.sample_logweights
-                )
-                lw_z_sim.append(self.model(batch_sim).squeeze(-1) + lw_sample)
-
-            predictions["lw_z_sim"].append(
-                torch.cat(lw_z_sim, dim=1 if self.model.ensembled else 0).cpu()
+            batch_sim = batch[batch.labels == 0].to(self.device, non_blocking=True)
+            lw_sample = (
+                0.0
+                if batch_sim.sample_logweights is None
+                else batch_sim.sample_logweights
             )
+            lw_z_sim.append(self.model(batch_sim).squeeze(-1) + lw_sample)
 
-        # stack
-        predictions["lw_z_sim"] = (
-            predictions["lw_z_sim"][0]
-            if self.model.ensembled
-            else torch.stack(predictions["lw_z_sim"]).numpy()
-        )
+        if self.model.ensembled:
+            predictions["lw_z_sim"] = torch.cat(lw_z_sim, dim=1).cpu()
+        else:
+            predictions["lw_z_sim"] = torch.cat(lw_z_sim, dim=0).unsqueeze(0).cpu()
 
         return predictions
 
@@ -199,7 +187,7 @@ class UnfoldingExperiment(TrainingExperiment):
                 density=True,
                 ratio_lims=(0.6, 1.4),
             )
-            
+
             plt.subplots_adjust(top=0.9)
             auc = roc_auc_score(labels, preds, sample_weight=sample_weights)
             fig.suptitle(f"AUC = {auc:.5f}")

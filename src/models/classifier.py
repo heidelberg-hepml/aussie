@@ -10,9 +10,7 @@ class Classifier(Model):
 
     @property
     def lowlevel(self):
-        return isinstance(
-            self.net, (TransformerEncoder, LGATr)
-        )  # TODO: net as attribute in network
+        return self.net.lowlevel
 
     def batch_loss(self, batch: UnfoldingData) -> torch.Tensor:
 
@@ -48,12 +46,6 @@ class Classifier(Model):
         # average loss
         mean_dims = (0, 1) if self.ensembled else 0
         loss = (loss_dat.mean(mean_dims) + loss_sim.mean(mean_dims)) / 2
-
-        if self.bayesian:
-            kld = self.kld / self.train_size
-            self.log_scalar(kld, "KL")
-            self.log_scalar(loss, "loss_raw")
-            loss = loss + kld
 
         return loss
 

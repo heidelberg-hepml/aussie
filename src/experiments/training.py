@@ -31,9 +31,6 @@ class TrainingExperiment(BaseExperiment):
 
         if self.cfg.train:
 
-            if self.model.bayesian:
-                self.model.train_size += len(self.dataloaders["train"].dataset)
-
             # train model
             self.log.info("Running training")
 

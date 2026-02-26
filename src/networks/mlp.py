@@ -4,7 +4,7 @@ from functools import partial
 from itertools import pairwise
 from typing import Optional
 
-from .layers import BayesianLinear, StackedLinear
+from .layers import StackedLinear
 
 
 class MLP(nn.Module):
@@ -18,8 +18,6 @@ class MLP(nn.Module):
         act: str = "relu",
         out_act: Optional[str] = None,
         drop: float = 0.0,
-        bayesian: bool = False,
-        bayesian_prior_prec: float = 1.0,
         init_gain: float = 1.0,
         out_bias_gain: float = 1.0,
         ensembled: Optional[int] = None,
@@ -31,13 +29,9 @@ class MLP(nn.Module):
         units = [dim_in, *(num_hidden_layers * [hidden_channels]), dim_out]
 
         self.dim_in = dim_in
-        self.bayesian = bayesian
         self.ensembled = ensembled
         linear_layer = (
-            partial(BayesianLinear, prior_prec=bayesian_prior_prec)
-            if bayesian
-            else (
-                partial(StackedLinear, channels=ensembled, gain=init_gain)
+            partial(StackedLinear, channels=ensembled, gain=init_gain)
                 if ensembled
                 else nn.Linear
             )
@@ -59,6 +53,8 @@ class MLP(nn.Module):
         self.out_act = getattr(F, out_act) if out_act else None
         self.drop = nn.Dropout(drop) if drop else None
 
+        self.lowlevel = False
+        
     def forward(self, x):
 
         if self.ensembled:
@@ -79,13 +75,3 @@ class MLP(nn.Module):
             x = self.out_act(x)
 
         return x
-
-    @property
-    def kld(self):
-        if self.bayesian:
-            return sum(layer.kld for layer in self.linear_layers)
-
-    def reseed(self):
-        if self.bayesian:
-            for layer in self.linear_layers:
-                layer.reseed()

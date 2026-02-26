@@ -98,7 +98,7 @@ def plot_reweighting(
     # weighted counts and errors
     y_rews, err_rews = [], []
     for ws, vs in zip(weights_list, variance_list):
-        if ws.ndim > 1:  # set of weights from bayesian sample
+        if ws.ndim > 1:  # set of weights from ensemble
 
             y_rews.append(np.histogram(sim, bins=bins, weights=ws.mean(0))[0])
             sum_w2s = binned_statistic(sim, (ws**2).mean(0), "sum", bins=bins)[0]
@@ -466,7 +466,7 @@ def plot_reweighting_ensemble(
     # weighted counts and errors
     y_rews, err_rews = [], []
     for ws, vs in zip(weights_list, variance_list):
-        assert ws.ndim > 1  # set of weights from bayesian sample
+        assert ws.ndim > 1  # set of weights from ensemble
 
         all_y = np.apply_along_axis(
             lambda w: np.histogram(sim, bins=bins, weights=w)[0], 1, ws
@@ -701,6 +701,7 @@ def plot_reweighting_ensemble(
 
     return fig, (main_ax, ratio_ax)
 
+
 def plot_reweighting_multi_ratio(
     exp,
     sim,
@@ -737,10 +738,16 @@ def plot_reweighting_multi_ratio(
 
     # make figure with ratio axis
     fig = plt.figure(figsize=figsize, constrained_layout=False)
-    grid = gridspec.GridSpec(1 + num_ratios, 1, figure=fig, height_ratios=[4] + [1.5] * num_ratios, hspace=0.0)
+    grid = gridspec.GridSpec(
+        1 + num_ratios,
+        1,
+        figure=fig,
+        height_ratios=[4] + [1.5] * num_ratios,
+        hspace=0.0,
+    )
     main_ax = plt.subplot(grid[0])
-    ratio_axes = [plt.subplot(grid[i+1]) for i in range(num_ratios)]
-    
+    ratio_axes = [plt.subplot(grid[i + 1]) for i in range(num_ratios)]
+
     for i in range(num_ratios):
         ratio_axes[i].axhline(1.0, color="gray", lw=1.0)
 
@@ -786,8 +793,8 @@ def plot_reweighting_multi_ratio(
     # weighted counts and errors
     y_rews, err_rews = [], []
     for ws, vs in zip(weights_list, variance_list):
-        assert ws.ndim > 1  # set of weights from bayesian sample
-        
+        assert ws.ndim > 1  # set of weights from ensemble
+
         all_y = np.apply_along_axis(
             lambda w: np.histogram(sim, bins=bins, weights=w)[0], 1, ws
         )
@@ -803,7 +810,7 @@ def plot_reweighting_multi_ratio(
         mean_within = np.mean(all_sum_w2s, axis=0)
         total_var = var_across + mean_within
         z = 1.0  # 1.0 <--> 68%, 1.96 <--> 95%
-        err = (central - z*np.sqrt(total_var), central + z*np.sqrt(total_var))        
+        err = (central - z * np.sqrt(total_var), central + z * np.sqrt(total_var))
         y_rew = central
 
         y_rews.append(y_rew)
@@ -831,7 +838,8 @@ def plot_reweighting_multi_ratio(
 
     for i, (y, err, label, color) in enumerate(zip(ys, errs, labels, colors)):
 
-        if (i==1) and not show_sim: continue
+        if (i == 1) and not show_sim:
+            continue
 
         legend_labels.append(label)
 
@@ -842,14 +850,14 @@ def plot_reweighting_multi_ratio(
             # else 1 / y_sim.sum() if (label in labels_rew) else 1 / y.sum()
         )
 
-        if i==1:
-            fill_obj=None
+        if i == 1:
+            fill_obj = None
         else:
             fill_obj = main_ax.fill_between(
                 bins,
                 dup_last(err[0]) * scale,
                 dup_last(err[1]) * scale,
-                alpha=0.1 if i==0 else 0.2,
+                alpha=0.1 if i == 0 else 0.2,
                 step="post",
                 facecolor=color,
                 zorder=i,
@@ -857,12 +865,13 @@ def plot_reweighting_multi_ratio(
         ratio_scale = denom.sum() / y.sum() if density else 1
         for ir in range(num_ratios):
             if ir in ratio_idcs[i]:
-                if i == 1: continue
+                if i == 1:
+                    continue
                 ratio_axes[ir].fill_between(
                     bins,
                     dup_last(err[0] / denom) * ratio_scale,
                     dup_last(err[1] / denom) * ratio_scale,
-                    alpha=0.1 if i==0 else 0.2,
+                    alpha=0.1 if i == 0 else 0.2,
                     step="post",
                     facecolor=color,
                     zorder=i,
@@ -874,23 +883,25 @@ def plot_reweighting_multi_ratio(
                 where="post",
                 color=color,
                 label=label,
-                lw=0.5 if i==1 else 1.,
-                ls = '--' if i==1 else '-',
+                lw=0.5 if i == 1 else 1.0,
+                ls="--" if i == 1 else "-",
                 zorder=i,
             )
             for ir in range(num_ratios):
                 if ir in ratio_idcs[i]:
                     ratio_axes[ir].step(
-                    bins,
-                    dup_last(y / denom) * ratio_scale,
-                    where="post",
-                    color=color,
-                    zorder=i,
-                    lw=0.5 if i==1 else 1.,
-                    ls = '--' if i==1 else '-',
-                )
+                        bins,
+                        dup_last(y / denom) * ratio_scale,
+                        where="post",
+                        color=color,
+                        zorder=i,
+                        lw=0.5 if i == 1 else 1.0,
+                        ls="--" if i == 1 else "-",
+                    )
 
-            legend_objs.append((fill_obj, line_obj) if fill_obj is not None else line_obj)
+            legend_objs.append(
+                (fill_obj, line_obj) if fill_obj is not None else line_obj
+            )
 
         else:
             bin_centers = 0.5 * (bins[1:] + bins[:-1])
@@ -912,12 +923,13 @@ def plot_reweighting_multi_ratio(
                         s=1.5,
                     )
 
-            legend_objs.append((fill_obj, point_obj))  
+            legend_objs.append((fill_obj, point_obj))
 
     # scales
     if logx:
         main_ax.semilogx()
-        for ir in range(num_ratios): ratio_axes[ir].semilogx()
+        for ir in range(num_ratios):
+            ratio_axes[ir].semilogx()
     if logy:
         main_ax.semilogy()
 
@@ -932,7 +944,9 @@ def plot_reweighting_multi_ratio(
     for ir in range(num_ratios):
         ratio_axes[ir].set_ylim(*ratio_lims)
         ratio_axes[ir].set_xlim(bins[0], bins[-1])
-        ratio_axes[ir].set_ylabel(rf'$\frac{{\mathrm{{{ratio_names[ir]}}}}}{{\mathrm{{Data}}}}$')
+        ratio_axes[ir].set_ylabel(
+            rf"$\frac{{\mathrm{{{ratio_names[ir]}}}}}{{\mathrm{{Data}}}}$"
+        )
         if ir < num_ratios - 1:
             ratio_axes[ir].set_xticklabels([])
 
