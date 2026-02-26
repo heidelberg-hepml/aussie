@@ -16,8 +16,8 @@ Two loss functions are provided for the second step:
 
 | Loss | Best for | Description |
 |------|----------|-------------|
-| **Gaussian kernel** (`gauss`) | Low-dimensional observables | Analytic kernel with a scale hyperparameter $\Lambda$ |
-| **AutoDiff** (`autodiff`) | High-dimensional / point-cloud data | Uses the Neural Tangent Kernel via `autograd`; no extra hyperparameters |
+| **Gaussian kernel** | Low-dimensional observables | Analytic kernel with a scale hyperparameter $\Lambda$ |
+| **AutoDiff** | High-dimensional / point-cloud data | Uses the Neural Tangent Kernel via `autograd`; no extra hyperparameters |
 
 AUSSIE consistently outperforms ten iterations of OmniFold in closure at both reco and part level across all benchmarks studied.
 
@@ -87,7 +87,7 @@ python aussie.py --config-name <CONFIG> [overrides]
 Train the reco-level density ratio classifier:
 
 ```bash
-python aussie.py --config-name cls dataset=zjet
+python aussie.py --config-name cls/gaussian
 ```
 
 ### Step 2 — Unfolding (AUSSIE)
@@ -95,7 +95,7 @@ python aussie.py --config-name cls dataset=zjet
 Train the part-level unfolder, pointing to the trained classifier:
 
 ```bash
-python aussie.py --config-name unf dataset=zjet cls_path=<path/to/classifier/run>
+python aussie.py --config-name unf/gaussian cls_path=<path/to/classifier/run>
 ```
 
 ### OmniFold Baseline
@@ -103,7 +103,7 @@ python aussie.py --config-name unf dataset=zjet cls_path=<path/to/classifier/run
 Run iterative OmniFold for comparison:
 
 ```bash
-python aussie.py --config-name itr dataset=zjet iterations=10
+python aussie.py --config-name itr/gaussian iterations=10
 ```
 
 ### Common Overrides
@@ -119,6 +119,9 @@ python aussie.py --config-name cls dataset=gaussian_toy
 
 # Use LGATr architecture for constituent-level data
 python aussie.py --config-name cls dataset=zjet_particle net=lgatr
+
+# Chain AUSSIE steps 1 & 2 with the iteration experiment
+python aussie.py --config-name itr/yukawa model._target_=src.models.Unfolder
 
 # Skip training and only evaluate / plot existing results
 python aussie.py --config-name rerun prev_exp_dir=<path/to/run>
