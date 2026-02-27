@@ -69,7 +69,7 @@ conda env create -f env.yaml
 conda activate aussie
 ```
 
-**Requirements:** Python 3.10, PyTorch, Hydra, NumPy, Matplotlib, scikit-learn, SciPy, TensorBoard, [schedulefree](https://github.com/facebookresearch/schedule_free), [energyflow](https://energyflow.network/) (for the Zj dataset).
+**Requirements:** Python 3.10, PyTorch, Hydra, NumPy, Matplotlib, Pandas, scikit-learn, SciPy, TensorBoard, [schedulefree](https://github.com/facebookresearch/schedule_free), [energyflow](https://energyflow.network/) (for the Zj dataset).
 
 For constituent-level experiments using LGATr, `xformers` and `jvp_flash_attention` are additionally required.
 
@@ -114,23 +114,20 @@ Override any config value from the command line:
 python aussie.py --config-name unf ... training.batch_size=2048 training.lr=5e-4
 
 # Use a different dataset
-python aussie.py --config-name cls dataset=gaussian_toy
-
-# Use LGATr architecture for constituent-level data
-python aussie.py --config-name cls dataset=zjet_particle net=lgatr
+python aussie.py --config-name cls/yukawa
 
 # Chain AUSSIE steps 1 & 2 with the iteration experiment
 python aussie.py --config-name itr/yukawa model._target_=src.models.Unfolder
 
 # Skip training and only evaluate / plot existing results
-python aussie.py --config-name rerun prev_exp_dir=<path/to/run>
+python aussie.py prev_exp_dir=<path/to/run> train=false
 ```
 
 ### Available Datasets
 
 | Config name | Description |
 |---|---|
-| `gaussian_toy` | 1D Gaussian toy example |
+| `gaussian` | 1D Gaussian toy example |
 | `zjet` | Jet substructure observables (6D) |
 | `zjet_corrected` | Jet substructure observables with hidden variables correction (6D) |
 | `zjet_particle` | Jet constituents (full phase space) |
