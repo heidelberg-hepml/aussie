@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-import numpy as np
 
 from xformers.ops import memory_efficient_attention
 from jvp_flash_attention.jvp_attention import attention as jvp_attention
@@ -59,7 +58,6 @@ class Attention(nn.Module):
         self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
 
-
         if self.use_jvp:
 
             B, N, C = x.shape
@@ -72,7 +70,11 @@ class Attention(nn.Module):
             q, k = self.q_norm(q), self.k_norm(k)
 
             # # dont attend to padded elements
-            attn_mask = None if mask is None else mask.view(B, 1, 1, N).expand(-1, self.num_heads, N, -1)
+            attn_mask = (
+                None
+                if mask is None
+                else mask.view(B, 1, 1, N).expand(-1, self.num_heads, N, -1)
+            )
 
             x = jvp_attention(
                 q,
@@ -92,7 +94,7 @@ class Attention(nn.Module):
             #     attn_mask=attn_mask,
             #     dropout_p=self.drop_attn.p if self.training else 0.0,
             # )
-            
+
             B, N, C = x.shape
             qkv = (
                 self.qkv(x)
@@ -113,81 +115,6 @@ class Attention(nn.Module):
         x = self.proj(x)
         x = self.drop_proj(x)
         return x
-
-
-class BayesianLinear(nn.Module):
-
-    def __init__(
-        self,
-        in_features: int,
-        out_features: int,
-        prior_prec: float = 1.0,
-        _map: bool = False,
-        std_init: float = -9,
-    ):
-        """
-        :param in_features: input dimension
-        :param out_features: output dimension
-        :param prior_prec: 1/sigma_prior^2, width of prior weight distribution
-        :param _map: if true weights will not be sampled but maximum-a-posteriori (mean) will be used instead
-        :param std_init: initialization of learned sigma
-        """
-        super().__init__()
-        self.n_in = in_features
-        self.n_out = out_features
-        self.map = _map
-        self.prior_prec = prior_prec
-        self.random = None
-        self.bias = nn.Parameter(torch.empty(out_features))
-        self.mu_w = nn.Parameter(torch.empty(out_features, in_features))
-        self.logsig2_w = nn.Parameter(torch.empty(out_features, in_features))
-        self.std_init = std_init
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        stdv = 1.0 / math.sqrt(self.mu_w.size(1))
-        self.mu_w.data.normal_(0, stdv)
-        self.logsig2_w.data.zero_().normal_(self.std_init, 0.001)
-        self.bias.data.zero_()
-
-    @property
-    def kld(self):
-        # limit values to -11, 11
-        logsig2_w = self.logsig2_w.clamp(-11, 11)
-        # KL divergence of two gaussians
-        kld = (
-            self.prior_prec * (self.mu_w.pow(2) + logsig2_w.exp())
-            - logsig2_w
-            - 1
-            - np.log(self.prior_prec)
-        ).sum() / 2
-        return kld
-
-    def forward(self, input):
-        if self.training:
-            # local reparameterization trick is more efficient and leads to
-            # an estimate of the gradient with smaller variance.
-            # https://arxiv.org/pdf/1506.02557.pdf
-            mu_out = F.linear(input, self.mu_w, self.bias)
-            logsig2_w = self.logsig2_w.clamp(-11, 11)
-            s2_w = logsig2_w.exp()
-            var_out = F.linear(input.pow(2), s2_w) + 1e-8
-            return mu_out + var_out.sqrt() * torch.randn_like(mu_out)
-
-        else:
-            if self.map:  # just return the mean, no sampling
-                return F.linear(input, self.mu_w, self.bias)
-
-            logsig2_w = self.logsig2_w.clamp(-11, 11)
-            if self.random is None:
-                self.random = torch.randn_like(self.logsig2_w)
-            s2_w = logsig2_w.exp()
-            # sample gaussian random numbers
-            weight = self.mu_w + s2_w.sqrt() * self.random
-            return F.linear(input, weight, self.bias) + 1e-8
-
-    def reseed(self):
-        self.random = None
 
 
 class StackedLinear(nn.Module):

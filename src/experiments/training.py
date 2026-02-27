@@ -24,15 +24,12 @@ class TrainingExperiment(BaseExperiment):
                 self.init_model()
 
             # initialize dataloaders in train mode
-            self.log.info(f"Creating dataLoaders")
+            self.log.info("Creating dataLoaders")
             self.dataloaders = dict(
                 zip(("train", "val", "test"), self.init_dataloader(training=True))
             )
 
         if self.cfg.train:
-
-            if self.model.bayesian:
-                self.model.train_size += len(self.dataloaders["train"].dataset)
 
             # train model
             self.log.info("Running training")
@@ -58,7 +55,7 @@ class TrainingExperiment(BaseExperiment):
                 self.init_model()
 
             # initialize dataloaders (without drop_last)
-            self.log.info(f"Creating dataLoaders")
+            self.log.info("Creating dataLoaders")
             self.dataloaders = dict(
                 zip(("train", "val", "test"), self.init_dataloader(training=False))
             )

@@ -1,12 +1,13 @@
 # @package _global_
 defaults:
   - /cls
+  - override /dataset: zjet
   - _self_
 
 net:
   dim_in: ${dataset.process.num_features}
   dim_out: 1
-  ensembled: 64
+  ensembled: false
 
 training:
   optimizer:

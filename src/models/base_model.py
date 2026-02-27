@@ -27,11 +27,6 @@ class Model(nn.Module):
         # logging
         self.log_buffer = defaultdict(list)
 
-        # bayesian
-        self.bayesian = self.net.bayesian
-        if self.bayesian:
-            self.register_buffer("train_size", torch.zeros(()))
-
         # ensembling
         self.ensembled = self.net.ensembled
 
@@ -42,15 +37,6 @@ class Model(nn.Module):
     @property
     def trainable_parameters(self):
         return (p for p in self.parameters() if (p.requires_grad and p.numel() > 0))
-
-    @property
-    def kld(self):
-        if self.bayesian:
-            return self.net.kld
-
-    def reseed(self):
-        if self.bayesian:
-            self.net.reseed()
 
     def update(self, loss, optimizer, scaler, step=None, total_steps=None):
 

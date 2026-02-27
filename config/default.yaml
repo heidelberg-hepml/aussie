@@ -47,6 +47,6 @@ plotting:
 
 defaults:
   - cluster: slurm
-  - dataset: omnifold
+  - dataset: gaussian
   - hydra
   - _self_

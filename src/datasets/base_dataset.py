@@ -23,8 +23,8 @@ class UnfoldingData:
     cond_z: Optional[torch.Tensor] = None
     mask_x: Optional[torch.Tensor] = None
     mask_z: Optional[torch.Tensor] = None
-    conds: Optional[torch.Tensor] = None
     labels: Optional[torch.Tensor] = None
+    conds: Optional[torch.Tensor] = None
     sample_logweights: Optional[torch.Tensor] = None
 
     @classmethod

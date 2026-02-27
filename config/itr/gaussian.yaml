@@ -1,9 +1,9 @@
 # @package _global_
 defaults:
   - /itr
-  - /cls@cls: yukawa
-  - /unf@unf: yukawa
-  - override /dataset: yukawa
+  - /cls@cls: gaussian
+  - /unf@unf: gaussian
+  - override /dataset: gaussian
   - _self_
 
 unf:

@@ -1,0 +1,7 @@
+name: zjet
+reader:
+  _target_: src.datasets.ZJetData.read
+  path: /remote/gpu02/ore/data/energyflow
+process:
+  _target_: src.datasets.ZJetProcess
+  num_features: 6

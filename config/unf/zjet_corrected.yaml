@@ -1,15 +1,15 @@
 # @package _global_
 defaults:
   - /unf
+  - override /dataset: zjet_corrected
   - _self_
 
 net:
   dim_in: ${dataset.process.num_features}
   dim_out: 1
-  ensembled: 20
+  ensembled: false
 
 training:
-  lr: 5e-3
+  lr: 1e-4
   optimizer:
     warmup_steps: 5000
-    betas: [0.95,0.999]

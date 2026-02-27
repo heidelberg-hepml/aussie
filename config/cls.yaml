@@ -9,15 +9,10 @@ experiment: ClassificationExperiment
 prev_it_path: null
 
 loss: bce
-bayesian: false
 
 model:
   _target_: src.models.Classifier
 
-# net:
-#   dim_in: ${dataset.dim}
-#   dim_out: 1
-#   bayesian: ${bayesian}
 
 training:
   lr: 1e-3
@@ -26,7 +21,6 @@ training:
   patience: 50
   optimizer:
     weight_decay: 0.0
-    # warmup_steps: 5000
 
 data:
   on_gpu: true

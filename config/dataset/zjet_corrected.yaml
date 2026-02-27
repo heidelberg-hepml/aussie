@@ -1,0 +1,8 @@
+name: zjet_corrected
+reader:
+  _target_: src.datasets.ZJetData.read
+  path: /remote/gpu02/ore/data/energyflow
+  correction_weights: /remote/gpu02/ore/station/data/correction_weights_zjet.npy
+process:
+  _target_: src.datasets.ZJetProcess
+  num_features: 6  

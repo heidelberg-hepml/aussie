@@ -1,7 +1,0 @@
-# @package _global_
-defaults:
-  - /itr
-  - /cls@cls: omnifold_corrected
-  - /unf@unf: omnifold_corrected
-  - override /dataset: omnifold_corrected
-  - _self_

@@ -1,9 +1,9 @@
 # @package _global_
 defaults:
   - /itr
-  - /cls@cls: yukawa
-  - /unf@unf: yukawa
-  - override /dataset: yukawa
+  - /cls@cls: zjet
+  - /unf@unf: zjet
+  - override /dataset: zjet
   - _self_
 
 unf:

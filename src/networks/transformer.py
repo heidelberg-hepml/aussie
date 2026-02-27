@@ -6,7 +6,7 @@ from torch.utils.checkpoint import checkpoint
 from typing import Optional
 from xformers.ops.fmha import BlockDiagonalMask
 
-from .layers import Attention, BayesianLinear, FeedForward
+from .layers import Attention, FeedForward
 
 
 class TransformerEncoder(nn.Module):
@@ -24,7 +24,6 @@ class TransformerEncoder(nn.Module):
         drop_attn: float = 0.0,
         drop_proj: float = 0.0,
         drop_mlp: float = 0.0,
-        bayesian: bool = False,
         max_len: int = 100,
         pos_dim: int = 5,
         head: Optional[torch.nn.Module] = None,
@@ -34,7 +33,6 @@ class TransformerEncoder(nn.Module):
 
         super().__init__()
         self.dim_in = dim_in
-        self.bayesian = bayesian
 
         self.max_len = max_len
         # input/output embeddings
@@ -70,6 +68,8 @@ class TransformerEncoder(nn.Module):
         self.out_norm = nn.LayerNorm(hidden_channels)
         if self.encode_pos:
             self.pos_encoding = nn.Embedding(max_len, hidden_channels)
+
+        self.lowlevel = True
 
     def forward(
         self,
@@ -119,15 +119,6 @@ class TransformerEncoder(nn.Module):
             x = self.head(x)
 
         return x
-
-    @property
-    def kld(self):
-        if self.bayesian:
-            return self.proj_out.kld
-
-    def reseed(self):
-        if self.bayesian:
-            self.proj_out.reseed()
 
 
 class TransformerBlock(nn.Module):

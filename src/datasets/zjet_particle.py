@@ -3,21 +3,19 @@ import numpy as np
 import os
 import torch
 import torch.nn.functional as F
-import warnings
 
 from collections import defaultdict
 from dataclasses import dataclass
-from lgatr import get_spurions
 from tensordict import tensorclass
 from typing import Callable, Tuple, Optional
 
 from src.datasets.base_dataset import UnfoldingData
 from src.utils.observable import Observable
-from src.utils.transforms import OmniFoldCartesianTransform
+from src.utils.transforms import LorentzTransform
 
 
 @tensorclass
-class OmniFoldCartesianData(UnfoldingData):
+class ZJetParticleData(UnfoldingData):
 
     @classmethod
     def read(
@@ -53,10 +51,10 @@ class OmniFoldCartesianData(UnfoldingData):
                 d = dicts[0]  # always select Pythia
 
             keep = (  # avoid divide by zero and log(zero)
-                (o[f"sim_tau1"] != 0)
-                & (o[f"gen_tau1"] != 0)
-                & (o[f"sim_log_rho"] > -100)
-                & (o[f"gen_log_rho"] > -100)
+                (o["sim_tau1"] != 0)
+                & (o["gen_tau1"] != 0)
+                & (o["sim_log_rho"] > -100)
+                & (o["gen_log_rho"] > -100)
             )[:num]
 
             for k, prefix in zip(("x", "z"), ("sim", "gen")):
@@ -101,7 +99,6 @@ class OmniFoldCartesianData(UnfoldingData):
                     )[keep].float()
                 )
 
-
             size = len(tensor)
 
             # construct correction weights for data
@@ -121,10 +118,39 @@ class OmniFoldCartesianData(UnfoldingData):
         return cls(batch_size=[batch_size], device=device, **tensor_kwargs)
 
 
+@tensorclass
+class ZJetParticleTransform:
+    """
+    TODO
+    """
+
+    def forward(self, batch):
+
+        batch.x, batch.mask_x = LorentzTransform.forward(
+            batch.x, batch.cond_x, batch.mask_x
+        )
+        batch.z, batch.mask_z = LorentzTransform.forward(
+            batch.z, batch.cond_z, batch.mask_z
+        )
+
+        return batch
+
+    def reverse(self, batch):
+
+        batch.x, batch.mask_x = LorentzTransform.reverse(
+            batch.x, batch.cond_x, batch.mask_x
+        )
+        batch.z, batch.mask_z = LorentzTransform.reverse(
+            batch.z, batch.cond_z, batch.mask_z
+        )
+
+        return batch
+
+
 @dataclass
-class OmniFoldCartesianProcess:
+class ZJetParticleProcess:
     num_features: int = 4
-    transforms: Tuple[Callable] = (OmniFoldCartesianTransform(),)
+    transforms: Tuple[Callable] = (ZJetParticleTransform(),)
     observables_x: Tuple[Observable] = (
         Observable(
             name="pt",
@@ -156,7 +182,7 @@ class OmniFoldCartesianProcess:
             compute=lambda x: x[..., 4],
             label=r"$\text{N-subjettiness ratio } \tau_{21}$",
             # xlims=(0.1, 1.1),
-            qlims=(1e-3, 1-1e-3),
+            qlims=(1e-3, 1 - 1e-3),
         ),
         Observable(
             name="zg",
@@ -202,7 +228,7 @@ class OmniFoldCartesianProcess:
             compute=lambda z: z[..., 4],
             label=r"$\text{N-subjettiness ratio } \tau_{21}$",
             # xlims=(0.1, 1.1),
-            qlims=(1e-3, 1-1e-3),
+            qlims=(1e-3, 1 - 1e-3),
         ),
         Observable(
             name="zg",

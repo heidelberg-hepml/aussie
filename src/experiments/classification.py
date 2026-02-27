@@ -27,28 +27,17 @@ class ClassificationExperiment(TrainingExperiment):
 
         # get predictions across the test set
         predictions = defaultdict(list)
-        n_evals = self.cfg.num_bnn_samples if self.model.bayesian else 1
-        for _ in range(n_evals):
 
-            if self.model.bayesian:  # sample new bnn weights
-                self.model.reseed()
+        # collect predictions
+        lw_x = [
+            self.model(batch.to(self.device, non_blocking=True)).squeeze(-1)
+            for batch in dataloader
+        ]
 
-            # collect predictions
-            lw_x = [
-                self.model(batch.to(self.device, non_blocking=True)).squeeze(-1)
-                for batch in dataloader
-            ]
-
-            predictions["lw_x"].append(
-                torch.cat(lw_x, dim=1 if self.model.ensembled else 0).cpu()
-            )
-
-        # stack
-        predictions["lw_x"] = (
-            predictions["lw_x"][0]
-            if self.model.ensembled
-            else torch.stack(predictions["lw_x"]).numpy()
-        )
+        if self.model.ensembled:
+            predictions["lw_x"] = torch.cat(lw_x, dim=1).cpu()
+        else:
+            predictions["lw_x"] = torch.cat(lw_x, dim=0).unsqueeze(0).cpu()
 
         return predictions
 
@@ -73,13 +62,15 @@ class ClassificationExperiment(TrainingExperiment):
         mask_sim = labels == 0
         mask_dat = ~mask_sim
         lw_x = record["lw_x"]
-        lw_x_sim = lw_x[..., mask_sim.numpy()].mean(0) # TODO: remove mean for ensemble uncertainties
+        lw_x_sim = lw_x[..., mask_sim.numpy()].mean(
+            0
+        )  # TODO: remove mean for ensemble uncertainties
 
         # load sample weights from iteration or data correction
         if (p := self.cfg.prev_it_path) is not None:
 
             lw_sample_sim = torch.from_numpy(
-                np.load(os.path.join(p, f"unf/predictions_test.npz"))["lw_z_sim"].mean(
+                np.load(os.path.join(p, "unf/predictions_test.npz"))["lw_z_sim"].mean(
                     0
                 )
             )
@@ -98,7 +89,7 @@ class ClassificationExperiment(TrainingExperiment):
         else:
             z_dat = test_set[:].aux_z[mask_dat]
             z_sim = test_set[:].aux_z[mask_sim]
-        with PdfPages(os.path.join(savedir, f"latents.pdf")) as pdf:
+        with PdfPages(os.path.join(savedir, "latents.pdf")) as pdf:
             for obs in self.process.observables_z:
                 fig, ax = plotting.plot_reweighting(
                     exp=obs.compute(z_dat).numpy(),
@@ -127,7 +118,7 @@ class ClassificationExperiment(TrainingExperiment):
         else:
             x_dat = test_set[:].aux_x[mask_dat]
             x_sim = test_set[:].aux_x[mask_sim]
-        with PdfPages(os.path.join(savedir, f"observables.pdf")) as pdf:
+        with PdfPages(os.path.join(savedir, "observables.pdf")) as pdf:
             for obs in self.process.observables_x:
                 fig, ax = plotting.plot_reweighting(
                     exp=obs.compute(x_dat).numpy(),
@@ -174,10 +165,10 @@ class ClassificationExperiment(TrainingExperiment):
                 density=True,
                 ratio_lims=(0.6, 1.4),
             )
-            
+
             plt.subplots_adjust(top=0.9)
             auc = roc_auc_score(labels, preds, sample_weight=sample_weights)
             fig.suptitle(f"AUC = {auc:.5f}")
 
             pdf.savefig(fig)
-            plt.close(fig)                
+            plt.close(fig)

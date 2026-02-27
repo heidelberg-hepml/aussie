@@ -1,7 +1,0 @@
-name: omnifold
-reader:
-  _target_: src.datasets.OmniFoldData.read
-  path: /remote/gpu02/ore/data/energyflow
-process:
-  _target_: src.datasets.OmniFoldProcess
-  num_features: 6

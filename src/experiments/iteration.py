@@ -5,6 +5,7 @@ from omegaconf import OmegaConf
 from src.experiments import ClassificationExperiment, UnfoldingExperiment
 from src.experiments.base_experiment import BaseExperiment
 
+
 class IterationExperiment(BaseExperiment):
 
     def run(self):
@@ -18,12 +19,16 @@ class IterationExperiment(BaseExperiment):
         else:
             start_it = int(self.cfg.prev_it_path.split("it_")[-1].strip("/")) + 1
 
+        unf_dir = None
+
         for it in range(start_it, start_it + self.cfg.iterations):
 
             self.log.info(f"Starting iteration {it}")
 
             # point to previous iteration if it exists
-            self.prev_it_path = os.path.dirname(unf_dir) if it > 1 else self.cfg.prev_it_path
+            self.prev_it_path = (
+                os.path.dirname(unf_dir) if it > start_it else self.cfg.prev_it_path
+            )
 
             # run step one
             if (self.cfg.cls_path is None) or it > 1:
@@ -31,7 +36,7 @@ class IterationExperiment(BaseExperiment):
             else:
                 # skip classification if cls_path provided
                 # TODO: Assert consistency of cls_path and prev_it_path
-                self.log.info(f"Skipping classification step")
+                self.log.info("Skipping classification step")
                 cls_dir = self.cfg.cls_path
 
             # run step two
