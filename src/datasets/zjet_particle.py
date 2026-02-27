@@ -6,7 +6,6 @@ import torch.nn.functional as F
 
 from collections import defaultdict
 from dataclasses import dataclass
-from lgatr import get_spurions
 from tensordict import tensorclass
 from typing import Callable, Tuple, Optional
 

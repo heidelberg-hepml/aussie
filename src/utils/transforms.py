@@ -1,6 +1,5 @@
 import torch
-from tensordict import tensorclass
-
+from lgatr import get_spurions
 
 class ShiftAndScale:
     """

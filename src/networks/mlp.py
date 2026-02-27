@@ -32,9 +32,8 @@ class MLP(nn.Module):
         self.ensembled = ensembled
         linear_layer = (
             partial(StackedLinear, channels=ensembled, gain=init_gain)
-                if ensembled
-                else nn.Linear
-            )
+            if ensembled
+            else nn.Linear
         )
         self.linear_layers = nn.ModuleList(
             [linear_layer(a, b) for a, b in pairwise(units)]
@@ -54,7 +53,7 @@ class MLP(nn.Module):
         self.drop = nn.Dropout(drop) if drop else None
 
         self.lowlevel = False
-        
+
     def forward(self, x):
 
         if self.ensembled:
