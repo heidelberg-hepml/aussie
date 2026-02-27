@@ -10,7 +10,7 @@ AUSSIE is a non-iterative, discriminative method for unbinned unfolding of multi
 Unfolding is the inverse problem of deconvolving observed (reco-level) measurements to recover the underlying truth (part-level) distributions. AUSSIE phrases this problem in terms of density ratios and solves it in two steps:
 
 1. **Classification** — Train a classifier $R_\theta(x)$ to estimate the reco-level density ratio $p_\text{data}(x) / p_\text{sim}(x)$.
-2. **Unfolding** — Train a part-level network $\overline R_\varphi(x)$ such that its forward mapping matches $R_\theta(x)$, by minimizing the RKHS norm of the functional gradient of an MLC loss. This directly yields part-level weights that solve the unfolding integral equation — no iterations needed.
+2. **Unfolding** — Train a part-level network $\overline R_\varphi(z)$ such that its forward mapping matches $R_\theta(x)$, by minimizing the RKHS norm of the functional gradient of an MLC loss. This directly yields part-level weights that solve the unfolding integral equation — no iterations needed.
 
 Two loss functions are provided for the second step:
 
