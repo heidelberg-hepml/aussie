@@ -2,7 +2,7 @@ name: gaussian
 reader:
   _target_: src.datasets.GaussianToyData.read
   num: 10_000_000
-  smear_width: 3
+  smear_width: 2
   mu_sim: 0.0
   mu_dat: 0.2
   sigma_sim: 1.0
