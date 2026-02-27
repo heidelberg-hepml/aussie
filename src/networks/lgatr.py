@@ -1,11 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from contextlib import nullcontext
 from torch.nn.attention import sdpa_kernel, SDPBackend
 from typing import Optional
-from lgatr import get_spurions
 
 
 class LGATr(nn.Module):

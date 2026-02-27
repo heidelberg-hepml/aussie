@@ -12,6 +12,7 @@ from typing import Dict
 
 log = logging.getLogger("Trainer")
 
+
 class Trainer:
 
     def __init__(
@@ -73,7 +74,7 @@ class Trainer:
             path = os.path.join(self.exp_dir, checkpoint)
             self.load(path)
             # avoid overriding checkpoint
-            os.rename(path, path.replace(".pt", f"_old.pt"))
+            os.rename(path, path.replace(".pt", "_old.pt"))
             log.info(f"Warm starting training from epoch {self.start_epoch}")
 
         # compile model

@@ -1,6 +1,6 @@
 import os
 import sys
-from omegaconf import OmegaConf, open_dict
+from omegaconf import OmegaConf
 
 
 def get_prev_config(prev_exp_dir):

@@ -24,7 +24,7 @@ class TrainingExperiment(BaseExperiment):
                 self.init_model()
 
             # initialize dataloaders in train mode
-            self.log.info(f"Creating dataLoaders")
+            self.log.info("Creating dataLoaders")
             self.dataloaders = dict(
                 zip(("train", "val", "test"), self.init_dataloader(training=True))
             )
@@ -55,7 +55,7 @@ class TrainingExperiment(BaseExperiment):
                 self.init_model()
 
             # initialize dataloaders (without drop_last)
-            self.log.info(f"Creating dataLoaders")
+            self.log.info("Creating dataLoaders")
             self.dataloaders = dict(
                 zip(("train", "val", "test"), self.init_dataloader(training=False))
             )

@@ -6,7 +6,6 @@ from omegaconf import DictConfig
 from src.models.classifier import Classifier
 from src.models.base_model import Model
 from src.datasets import UnfoldingData
-from src.networks import TransformerEncoder, LGATr
 from src.utils.utils import load_model
 
 
@@ -41,23 +40,6 @@ class Unfolder(Model):
 
         if self.lowlevel:
             return self.net(batch.z, c=batch.cond_z, mask=batch.mask_z)
-
-        if batch.aux_z is not None:
-
-            # create a temporary object to hold features for the transform
-            class FeatureContainer:
-                def __init__(self, z):
-                    self.z = z
-                    self.x = torch.empty_like(z)
-
-            features = FeatureContainer(batch.aux_z[..., 1:].clone())
-
-            # apply preprocessing
-            # we move the transform to the device of the data
-            transform = OmniFoldObsProcess().transforms[0].to(batch.device)
-            transform.forward(features)
-
-            return self.net(features.z)
 
         return self.net(batch.z)
 
@@ -131,19 +113,14 @@ class Unfolder(Model):
                 norm = lambda g: g.abs()
             case "l2":
                 norm = lambda g: g.pow(2)
-            case "l12":
-                norm = lambda g: g.pow(2)
 
         loss_gradnorm = (
             sum(norm(g).sum() for g in grads_x if g is not None) / self.num_params_cls
         )
 
-        if self.cfg.norm == "l12":
-            loss_gradnorm = loss_gradnorm.sqrt()
-
         self.log_scalar(loss_reg, "loss_reg")
         self.log_scalar(loss_gradnorm, "loss_gradnorm")
-        
+
         # # log the omnifold loss
         # with torch.no_grad():
         #     loss_omnifold = (-lw_x.exp() * lw_z - (1 - lw_z.exp())) / 2
@@ -205,7 +182,6 @@ class OmniFolder(Model):
         with torch.no_grad():
             lw_x = self.classifier(batch).squeeze(-1)
 
-
         if self.classifier.ensembled:
 
             if self.cfg.joint_ensembling:
@@ -260,7 +236,7 @@ class RKHSUnfolder(Unfolder):
         # forward pass classifier
         self.classifier.eval()
         with torch.no_grad():
-            lw_x = self.classifier(batch) #.squeeze(-1)
+            lw_x = self.classifier(batch)  # .squeeze(-1)
             if self.classifier.ensembled:
 
                 if self.cfg.joint_ensembling:

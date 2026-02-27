@@ -1,6 +1,5 @@
 import importlib
 import numpy as np
-import os
 import torch
 import warnings
 
@@ -46,10 +45,10 @@ class ZJetData(UnfoldingData):
                 d = dicts[0]  # always select Pythia
 
             mask = (  # avoid divide by zero and log(zero)
-                (d[f"gen_widths"] != 0)
-                & (d[f"sim_widths"] != 0)
-                & (d[f"gen_sdms"] > 0)
-                & (d[f"sim_sdms"] > 0)
+                (d["gen_widths"] != 0)
+                & (d["sim_widths"] != 0)
+                & (d["gen_sdms"] > 0)
+                & (d["sim_sdms"] > 0)
             )
 
             for k, prefix in zip(("x", "z"), ("sim", "gen")):

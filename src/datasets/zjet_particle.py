@@ -51,10 +51,10 @@ class ZJetParticleData(UnfoldingData):
                 d = dicts[0]  # always select Pythia
 
             keep = (  # avoid divide by zero and log(zero)
-                (o[f"sim_tau1"] != 0)
-                & (o[f"gen_tau1"] != 0)
-                & (o[f"sim_log_rho"] > -100)
-                & (o[f"gen_log_rho"] > -100)
+                (o["sim_tau1"] != 0)
+                & (o["gen_tau1"] != 0)
+                & (o["sim_log_rho"] > -100)
+                & (o["gen_log_rho"] > -100)
             )[:num]
 
             for k, prefix in zip(("x", "z"), ("sim", "gen")):

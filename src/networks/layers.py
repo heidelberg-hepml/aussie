@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-import numpy as np
 
 from xformers.ops import memory_efficient_attention
 from jvp_flash_attention.jvp_attention import attention as jvp_attention

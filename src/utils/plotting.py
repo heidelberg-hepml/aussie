@@ -135,7 +135,10 @@ def plot_reweighting(
         "#13b2b7",
     ]  # + [f"C{i}" for i in [1] + list(range(3, 8))]
     denom = ys[denom_idx]
-    dup_last = lambda a: np.append(a, a[-1])
+
+    def dup_last(a):
+        return np.append(a, a[-1])
+
     legend_objs, legend_labels = [], []
     for i, (y, err, label, color) in enumerate(zip(ys, errs, labels, colors)):
 
@@ -505,7 +508,10 @@ def plot_reweighting_ensemble(
         "#13b2b7",
     ]  # + [f"C{i}" for i in [1] + list(range(3, 8))]
     denom = ys[denom_idx]
-    dup_last = lambda a: np.append(a, a[-1])
+
+    def dup_last(a):
+        return np.append(a, a[-1])
+
     legend_objs, legend_labels = [], []
     for i, (y, err, label, color) in enumerate(zip(ys, errs, labels, colors)):
 
@@ -831,7 +837,10 @@ def plot_reweighting_multi_ratio(
         "#13b2b7",
     ]  # + [f"C{i}" for i in [1] + list(range(3, 8))]
     denom = ys[denom_idx]
-    dup_last = lambda a: np.append(a, a[-1])
+
+    def dup_last(a):
+        return np.append(a, a[-1])
+
     legend_objs, legend_labels = [], []
 
     ratio_idcs = [np.arange(len(ratio_idx))] * 2 + [[i] for i in ratio_idx]

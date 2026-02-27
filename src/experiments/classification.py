@@ -70,7 +70,7 @@ class ClassificationExperiment(TrainingExperiment):
         if (p := self.cfg.prev_it_path) is not None:
 
             lw_sample_sim = torch.from_numpy(
-                np.load(os.path.join(p, f"unf/predictions_test.npz"))["lw_z_sim"].mean(
+                np.load(os.path.join(p, "unf/predictions_test.npz"))["lw_z_sim"].mean(
                     0
                 )
             )
@@ -89,7 +89,7 @@ class ClassificationExperiment(TrainingExperiment):
         else:
             z_dat = test_set[:].aux_z[mask_dat]
             z_sim = test_set[:].aux_z[mask_sim]
-        with PdfPages(os.path.join(savedir, f"latents.pdf")) as pdf:
+        with PdfPages(os.path.join(savedir, "latents.pdf")) as pdf:
             for obs in self.process.observables_z:
                 fig, ax = plotting.plot_reweighting(
                     exp=obs.compute(z_dat).numpy(),
@@ -118,7 +118,7 @@ class ClassificationExperiment(TrainingExperiment):
         else:
             x_dat = test_set[:].aux_x[mask_dat]
             x_sim = test_set[:].aux_x[mask_sim]
-        with PdfPages(os.path.join(savedir, f"observables.pdf")) as pdf:
+        with PdfPages(os.path.join(savedir, "observables.pdf")) as pdf:
             for obs in self.process.observables_x:
                 fig, ax = plotting.plot_reweighting(
                     exp=obs.compute(x_dat).numpy(),
