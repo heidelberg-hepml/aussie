@@ -132,8 +132,9 @@ python aussie.py --config-name rerun prev_exp_dir=<path/to/run>
 | Config name | Description |
 |---|---|
 | `gaussian_toy` | 1D Gaussian toy example |
-| `zjet` | Zj jet substructure observables (6D) |
-| `zjet_particle` | Zj jet constituents (full phase space) |
+| `zjet` | Jet substructure observables (6D) |
+| `zjet_corrected` | Jet substructure observables with hidden variables correction (6D) |
+| `zjet_particle` | Jet constituents (full phase space) |
 | `yukawa` | $pp \to tHj$ parton-level events |
 
 ## Outputs
