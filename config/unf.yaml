@@ -23,6 +23,8 @@ training:
   batch_size: 4096
   test_batch_size: ${training.batch_size}
   patience: 50
+  optimizer:
+    betas: [0.98, 0.999]
 
 data:
   on_gpu: true

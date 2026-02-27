@@ -13,4 +13,3 @@ training:
   lr: 5e-3
   optimizer:
     warmup_steps: 5000
-    betas: [0.95,0.999]
