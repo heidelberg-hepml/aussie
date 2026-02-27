@@ -19,7 +19,6 @@ Two loss functions are provided for the second step:
 | **Gaussian kernel** | Low-dimensional observables | Analytic kernel with a scale hyperparameter $\Lambda$ |
 | **AutoDiff** | High-dimensional / point-cloud data | Uses the Neural Tangent Kernel via `autograd`; no extra hyperparameters |
 
-AUSSIE consistently outperforms ten iterations of OmniFold in closure at both reco and part level across all benchmarks studied.
 
 ## Project Structure
 
